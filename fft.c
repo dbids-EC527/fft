@@ -42,7 +42,7 @@ void fft(cplx buf[], int n)
 			buf[j] = temp;
 		}
     }
-	show_buffer(buf);
+	//show_buffer(buf);
 
 	/*Compute the FFT for the array*/
 	cplx wlen, w, u, v;
@@ -78,9 +78,9 @@ void fft(cplx buf[], int n)
                 buf[i+j+len/2] = u - v;
                 w *= wlen;
 				
-				printf("len is %d\ti + j is %d\t", len, i+j);
-				printf("w is (%g,%g)\t", creal(w), cimag(w));
-				printf("wlen is (%g,%g)\n", creal(w), cimag(w));
+				//printf("len is %d\ti + j is %d\t", len, i+j);
+				//printf("w is (%g,%g)\t", creal(w), cimag(w));
+				//printf("wlen is (%g,%g)\n", creal(w), cimag(w));
             }
         }
     }
@@ -89,7 +89,7 @@ void fft(cplx buf[], int n)
 int main()
 {
 	//Define and print the buffer before
-	cplx buf[] = {0, 1, 2, 3, 4, 5, 6, 7};
+	cplx buf[] = {0, 1, 1, 0, 0, 0, 0, 0};
 	int n = 8;
 	printf("Data: ");
 	show_buffer(buf);
