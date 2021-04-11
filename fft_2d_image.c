@@ -1,7 +1,7 @@
 /*	Devin Bidstrup 03/29/21-05/07/21
  
 	Must compile with:
-	gcc fft_2d.c -o fft_2d -lm -std=c99
+	gcc fft_2d_image.c ./image_utils/Image.c -o fft_2d_image -lm -std=c99
 	
 	Code based on a number of sources:
 	*	C language with recursion:
@@ -16,6 +16,14 @@
 #include <stdio.h>
 #include <math.h>
 #include <complex.h>
+
+//Image utilities
+#include "image_utils/Image.h"
+#include "image_utils/utils.h"
+/*#define STB_IMAGE_IMPLEMENTATION
+#include "image_utils/stb_image/stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "image_utils/stb_image/stb_image_write.h"*/
  
 #define PI 3.1415926535897932384
 typedef double complex cplx;
@@ -27,21 +35,51 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 int main()
-{
-	//Define and print the buffer before.
-	//Make buffer square and of a pow2 size
-	cplx buf[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-	int n = 16;
-	int rowLen = 4;
-	printf("Data: ");
-	show_buffer(buf, rowLen, n);
+{	
+	//Load image
+	Image img, img_after;
+	Image_load(&img, "sky.jpg");
+    ON_ERROR_EXIT(img.data == NULL, "Error in loading the image");
+    
+    //Check for squareness
+    if(img.width != img.height)
+    {
+    	printf("image is not square, width %d, height %d\n", img.width, img.height);
+    	exit(EXIT_FAILURE);
+    }
+	
+	//Copy image to complex buffer
+	int i;
+	int rowLen = img.width;
+	int n = rowLen * rowLen;
+	cplx* buf = (cplx*) calloc(n, sizeof(cplx));
+	for (i = 0; i < n; i++)
+		buf[i] = (int) img.data[i];
+		
+	/*int rowLen, colLen, channels;	
+	size_t size;
+	const char *fname = "sky.jpg";
+	//cplx* buf = (cplx*) calloc(n, sizeof(cplx));
+	cplx* buf = stbi_load(fname, &rowLen, &colLen, &channels, 0);
+	if (rowLen != colLen)
+	{
+    	printf("image is not square, width %d, height %d\n", rowLen, colLen);
+    	exit(EXIT_FAILURE);
+    }
+    int n = rowLen * rowLen;*/
 	
 	//Run FFT
 	fft_2d(buf, rowLen, n);
 	
-	//Print buffer after
-	printf("FFT result: ");
-	show_buffer(buf, rowLen, n);
+	//Copy image from complex buffer
+	Image_create(&img_after, img.width, img.height, img.channels, false);
+    ON_ERROR_EXIT(img_after.data == NULL, "Error in creating the image");
+	for (i = 0; i < n; i++)
+		img_after.data[i] = buf[i];
+	
+	Image_save(&img_after, "sky_after.jpg");
+	Image_free(&img);
+	Image_free(&img_after);
  
 	return 0;
 }
@@ -128,18 +166,18 @@ void fft_2d(cplx buf[], int rowLen, int n)
 	for(i = 0; i < n; i += rowLen)
 	{
 		fft(buf+i, rowLen);
-		show_buffer(buf, rowLen, n);
+		//show_buffer(buf, rowLen, n);
 	}
 
 	// Transpose the matrix
 	transpose(buf, rowLen);
-	show_buffer(buf, rowLen, n);
+	//show_buffer(buf, rowLen, n);
 
 	// Do columns
 	for(i = 0; i < n; i += rowLen)
 	{
 		fft(buf+i, rowLen);
-		show_buffer(buf, rowLen, n);
+		//show_buffer(buf, rowLen, n);
 	}
 
 	// Transpose back

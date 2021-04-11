@@ -21,7 +21,7 @@
 typedef double complex cplx;
 
 //Prototypes
-void show_buffer(cplx buf[]);
+void show_buffer(cplx buf[], int n);
 
 /* Performs in place FFT on buf of size n*/
 void fft(cplx buf[], int n) 
@@ -89,25 +89,25 @@ void fft(cplx buf[], int n)
 int main()
 {
 	//Define and print the buffer before
-	cplx buf[] = {0, 1, 1, 0, 0, 0, 0, 0};
-	int n = 8;
+	cplx buf[] = {-2+2*I, -2+2*I, -2+2*I, -2+2*I};
+	int n = 4;
 	printf("Data: ");
-	show_buffer(buf);
+	show_buffer(buf, n);
 	
 	//Run FFT
 	fft(buf, n);
 	
 	//Print buffer after
 	printf("FFT result: ");
-	show_buffer(buf);
+	show_buffer(buf, n);
 	printf("\n");
  
 	return 0;
 }
 
 //Print the complex arrays before and after FFT
-void show_buffer(cplx buf[]) {
-	for (int i = 0; i < 8; i++)
+void show_buffer(cplx buf[], int n) {
+	for (int i = 0; i < n; i++)
 		if (!cimag(buf[i]))
 			printf("%g ", creal(buf[i]));
 		else
