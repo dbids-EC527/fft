@@ -20,32 +20,6 @@
 #define PI 3.1415926535897932384
 typedef double complex cplx;
 
-//Prototypes
-void show_buffer(cplx buf[], int rowLen, int n);
-void transpose(cplx buf[], int rowLen);
-void fft(cplx buf[], int n);
-void fft_2d(cplx buf[], int rowLen, int n);
-
-int main()
-{
-	//Define and print the buffer before.
-	//Make buffer square and of a pow2 size
-	cplx buf[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-	int n = 16;
-	int rowLen = 4;
-	printf("Data: ");
-	show_buffer(buf, rowLen, n);
-	
-	//Run FFT
-	fft_2d(buf, rowLen, n);
-	
-	//Print buffer after
-	printf("FFT result: ");
-	show_buffer(buf, rowLen, n);
- 
-	return 0;
-}
-
 /* Performs in place FFT on buf of size n*/
 void fft(cplx buf[], int n) 
 {
