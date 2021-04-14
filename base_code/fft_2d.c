@@ -24,6 +24,7 @@ typedef double complex cplx;
 void fft(cplx buf[], int n) 
 {
 	//Rearrange the array such that it can be iterated upon in the correct order
+	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
 	for (int i = 1, j = 0; i < n; i++) 
 	{
 		int bit = n >> 1;

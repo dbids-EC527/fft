@@ -29,47 +29,70 @@
 #define PI 3.1415926535897932384
 typedef double complex cplx;
 
+//Used to define min and max for indicies
 #define MINVAL       0.0
 #define MAXVAL       10.0
-#define ROWLEN       1024
+
+//Used to iterate through different array sizes
+#define DELTA 32
+#define BASE  16
+#define ITERS 40     
 
 //Prototypes
 double interval(struct timespec start, struct timespec end);
 void initializeArray(cplx *arr, int len, int seed);
 
-
 int main(int argc, char *argv[])
 {	
   //Serial Timing variables:
   struct timespec time_start, time_stop;
+  double time_stamp[ITERS+1];
   
-  //Define and print the buffer before.
-	//Make buffer square and of a pow2 size
-	//cplx buf[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-	int rowLen = ROWLEN;
-  int n = ROWLEN * ROWLEN;
+  //Define the buffer max sizes
+  long int MAXSIZE = BASE+(ITERS+1)*DELTA;
+  int rowLen = MAXSIZE;
+  int n = MAXSIZE * MAXSIZE;
+  printf("Doing FFT for %d different matrix sizes from %d to %ld\n",
+      ITERS, DELTA, (long int) BASE+(ITERS)*DELTA);
+
+  //Intialize two copies of the input buffer
   cplx* buf = (cplx*) calloc(n, sizeof(cplx));
   initializeArray(buf, n, 2453);
+  cplx* buf_orig = (cplx*) calloc(n, sizeof(cplx));
+  memcpy(buf_orig, buf, n * sizeof(cplx));
 
-	//printf("Data: ");
-	//show_buffer(buf, rowLen, n);
-	
-  //Start Timer
-  clock_gettime(CLOCK_REALTIME, &time_start);
+  long int iters = 0;
+  for(long int i = BASE; iters < ITERS; i+=DELTA, iters++)
+  {
+    printf("iter %ld, size %ld\r", iters, i);
+    fflush(stdout);
 
-	//Run FFT
-	fft_2d(buf, rowLen, n);
+    //Start Timer
+    clock_gettime(CLOCK_REALTIME, &time_start);
 
-  //Stop Timer and calculate difference
-  clock_gettime(CLOCK_REALTIME, &time_stop);
-	
-	//Print buffer after
-	//printf("FFT result: ");
-	//show_buffer(buf, rowLen, n);
+    //Run FFT
+	  fft_2d(buf, i, i*i);
+
+    //Stop Timer and calculate difference
+    clock_gettime(CLOCK_REALTIME, &time_stop);
+
+    //Calculate timing difference
+    time_stamp[iters] = interval(time_start, time_stop);
+
+    //Reset the buffer to its previous values
+    memcpy(buf, buf_orig, i * i * sizeof(cplx));
+  }  
 
   //Print Timing
-  double time_spent = interval(time_start, time_stop);
-  printf("FFT_serial() took %f seconds\n", time_spent);
+  printf("Done collecting measurements.\n\n");
+  iters = 0;
+  for(long int i = BASE; iters < ITERS; i+=DELTA, iters++)
+  {
+    printf("%ld, %g\n", i,  (double)time_stamp[iters]);
+    
+    //printf("%ld, %g\n", i,  (((double)time_stamp[iters].tv_sec) + \
+                            ((double)time_stamp[iters].tv_sec)*1.0e-9));
+  }
  
 	return 0;
 }
