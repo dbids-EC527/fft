@@ -1,11 +1,9 @@
 /*	Devin Bidstrup 03/29/21-05/07/21
  
 	Must compile with:
-	gcc fft_2d_timing.c ./base_code/fft_2d.c -o fft_2d_timing -lm
+	gcc fft_2d_timing.c ./base_code/fft_2d.c -o fft_2d_timing -lm -std=c11
 
-  And run with:
-  ./fft_2d_image "image_name.jpg"
-	
+  	
 	Code based on a number of sources:
 	*	C language with recursion:
 		https://rosettacode.org/wiki/Fast_Fourier_transform#C
@@ -14,7 +12,7 @@
 	*	Helpful visualization of the algorithm:
 		https://towardsdatascience.com/fast-fourier-transform-937926e591cb
 */
-
+#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <math.h>
 #include <complex.h>
@@ -35,8 +33,8 @@ typedef double complex cplx;
 
 //Used to iterate through different array sizes
 #define DELTA 32
-#define BASE  16
-#define ITERS 40     
+#define BASE  0
+#define ITERS 250     
 
 //Prototypes
 double interval(struct timespec start, struct timespec end);
