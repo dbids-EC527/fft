@@ -33,8 +33,8 @@ typedef double complex cplx;
 
 //Used to iterate through different array sizes
 #define DELTA 32
-#define BASE  0
-#define ITERS 250     
+#define BASE 11136
+#define ITERS 200     
 
 //Prototypes
 double interval(struct timespec start, struct timespec end);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     clock_gettime(CLOCK_REALTIME, &time_start);
 
     //Run FFT
-	  fft_2d(buf, i, i*i);
+    fft_2d(buf, i, i*i);
 
     //Stop Timer and calculate difference
     clock_gettime(CLOCK_REALTIME, &time_stop);
