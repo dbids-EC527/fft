@@ -136,7 +136,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, rowLen*rowLen*sizeof(cuDoubleComplex)));
   for(int i = 0; i < rowLen*rowLen; i++)
   {
-    cuDoubleComplex[i] = make_cuDoubleComplex(creal(h_array[i]), cimag(h_array[i]));
+    d_array[i] = make_cuDoubleComplex(creal(h_array[i]), cimag(h_array[i]));
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
   
