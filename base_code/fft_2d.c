@@ -25,8 +25,8 @@ void fft(cplx buf[], int n)
 {
 	//Rearrange the array such that it can be iterated upon in the correct order
 	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
-	int i;
-	for ( i = 1, j = 0; i < n; i++) 
+	int i, j, len;
+	for (i = 1, j = 0; i < n; i++) 
 	{
 		int bit = n >> 1;
 		for (; j & bit; bit >>= 1)
@@ -47,8 +47,7 @@ void fft(cplx buf[], int n)
 	cplx wlen, w, u, v;
 	// len goes 2, 4, ... n/2, n
 	// len iterates over the array log2(n) times
-  int len;
-	for (len = 2; len <= n; len <<= 1) 
+  	for (len = 2; len <= n; len <<= 1) 
 	{
 		double ang = 2 * PI / len;
 		wlen = cexp(I * ang);
@@ -69,7 +68,6 @@ void fft(cplx buf[], int n)
 		for (i = 0; i < n; i += len) 
 		{
 			w = 1;
-			int j;
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
