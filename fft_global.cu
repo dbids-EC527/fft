@@ -12,6 +12,9 @@
 #include "cuPrintf.cuh"
 #include <cuComplex.h>
 
+//My own serial fft2d code
+#include "base_code/fft_2d.h"
+
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
@@ -23,9 +26,6 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
     if (abort) exit(code);
   }
 }
-
-//My own serial fft2d code
-#include "base_code/fft_2d.h"
  
 #define PI 3.1415926535897932384
 typedef double complex cplx;
