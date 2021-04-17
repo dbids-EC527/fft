@@ -50,7 +50,7 @@ void runIteration(int rowLen);
 
 /*......CUDA Device Functions......*/
 // FFT kernel per thread code
-__global__ void FFT_Kernel (int rowLen, cuDoubleComplex data) 
+__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data) 
 {
   int i, j, iters;
   
@@ -64,7 +64,7 @@ __global__ void FFT_Kernel (int rowLen, cuDoubleComplex data)
         //Reduce the current pixel
         if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
         {
-          data[i*rowLen+j] -= 5;
+          data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
         }
       }
     }
@@ -132,11 +132,12 @@ void runIteration(int rowLen)
   // Allocate arrays on GPU global memory
   //cplx *d_array;
   //CUDA_SAFE_CALL(cudaMalloc((void **)&d_array, allocSize));
-  cuDoubleComplex* d_arrayl
+  cuDoubleComplex* d_array;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, rowLen*rowLen*sizeof(cuDoubleComplex)));
   for(int i = 0; i < rowLen*rowLen; i++)
   {
-    cuDoubleComplex[i] = make_cuDoubleComplex(creal(h_array), cimag(h_array));
+    cuDoubleComplex[i] = make_cuDoubleComplex(creal(h_array[i]), cimag(h_array[i]));
+    CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
   
   // Start overall GPU timing
