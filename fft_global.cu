@@ -1,14 +1,16 @@
 /*
-    nvcc -arch sm_35 mmm_global.cu -o mmm_global
+    nvcc -arch sm_35 fft_global.cu -o fft_global
 */
 
 #include <cstdio>
 #include <cstdlib>
 #include <math.h>
+#include <complex.h>
 #include <time.h>
 #include <string.h>
 #include "cuPrintf.cu"
 #include "cuPrintf.cuh"
+#include <cuComplex.h>
 
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
@@ -48,9 +50,10 @@ void runIteration(int rowLen);
 
 /*......CUDA Device Functions......*/
 // FFT kernel per thread code
-__global__ void FFT_Kernel (int rowLen, cplx* data) 
+__global__ void FFT_Kernel (int rowLen, cuDoubleComplex data) 
 {
   int i, j, iters;
+  
   //Interleave threads over a single block of the total array
   for (iters = 0; iters < 2000; iters++) 
   {
@@ -61,7 +64,7 @@ __global__ void FFT_Kernel (int rowLen, cplx* data)
         //Reduce the current pixel
         if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
         {
-          data[i*rowLen+j] -= real(data[i*rowLen+j]);
+          data[i*rowLen+j] -= 5;
         }
       }
     }
@@ -127,16 +130,22 @@ void runIteration(int rowLen)
   printf("\t... done\n\n");
 
   // Allocate arrays on GPU global memory
-  cplx *d_array;
-  CUDA_SAFE_CALL(cudaMalloc((void **)&d_array, allocSize));
-
+  //cplx *d_array;
+  //CUDA_SAFE_CALL(cudaMalloc((void **)&d_array, allocSize));
+  cuDoubleComplex* d_arrayl
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, rowLen*rowLen*sizeof(cuDoubleComplex)));
+  for(int i = 0; i < rowLen*rowLen; i++)
+  {
+    cuDoubleComplex[i] = make_cuDoubleComplex(creal(h_array), cimag(h_array));
+  }
+  
   // Start overall GPU timing
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
 
   // Transfer the arrays to the GPU memory
-  CUDA_SAFE_CALL(cudaMemcpy(d_array, h_array, allocSize, cudaMemcpyHostToDevice));
+  //CUDA_SAFE_CALL(cudaMemcpy(d_array, h_array, allocSize, cudaMemcpyHostToDevice));
 
   // Configure the kernel
   dim3 DimGrid(GRID_DIM, GRID_DIM, 1);    
@@ -168,7 +177,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(h_C, d_C, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(h_array, d_array, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -268,7 +277,7 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f",real(data[i*rowLen+j]), img(data[i*rowLen+j]));
+      printf("%.1f+j%.1f",creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
