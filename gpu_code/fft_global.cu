@@ -135,11 +135,19 @@ void runIteration(int rowLen)
   //CUDA_SAFE_CALL(cudaMalloc((void **)&d_array, allocSize));
   cuDoubleComplex* d_array;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, rowLen*rowLen*sizeof(cuDoubleComplex)));
+
+  //Copy double complex array to cuDoubleComplex array
+  cuDoubleComplex d[rowLen*rowLen];
   for(int i = 0; i < rowLen*rowLen; i++)
   {
-    d_array[i] = make_cuDoubleComplex(creal(h_array[i]), cimag(h_array[i]));
+    double real_part = creal(h_array[i]);
+    double imag_part = cimag(h_array[i]);
+    d[i] = make_cuDoubleComplex(real_part, imag_part);
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
+  
+  //Transfer cuDoubleArray to device memory
+  CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
   
   // Start overall GPU timing
   cudaEventCreate(&start);
@@ -237,7 +245,6 @@ void runIteration(int rowLen)
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
-
   free(h_serial_array);
   free(h_array);
 
@@ -279,7 +286,7 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f",creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
+      printf("%.1f+j%.1f, ",creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
