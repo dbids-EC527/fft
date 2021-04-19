@@ -1,5 +1,5 @@
 /*
-    nvcc -arch sm_35 fft_global.cu -o fft_global
+    nvcc -arch sm_35 bitreverse.cu -o bitreverse
 */
 
 #include <cstdio>
@@ -46,26 +46,26 @@ void printArray(int rowLen, cplx* data);
 void runIteration(int rowLen);
 void show_buffer(cplx buf[], int rowLen, int n);
 void transpose(cplx buf[], int rowLen);
-void fft(cplx buf[], int n);
-void fft_2d(cplx buf[], int rowLen, int n);
+void reverse(cplx buf[], int n);
+void reverse_2d(cplx buf[], int rowLen, int n);
 
 __global__ void reverseArrayBlockRow(int i, int rowLen, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  __shared__ cuDoubleComplex s_data[BLOCK_DIM*BLOCK_DIM];
+  __shared__ cuDoubleComplex s_data[BLOCK_DIM];
   int rowIdx = i*rowLen;
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
 
   // Load one element per thread from device memory and store it 
   // *in reversed order* into temporary shared memory
-  s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
-
+  //s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
+  s_data[threadIdx.x] = d_in[rowIdx + j];	
   // Block until all threads in the block have written their data to shared memory
   __syncthreads();
 
   // write the data from shared memory in forward order, 
-  // but to the reversed block offset as before
-  j = (blockDim.x * (gridDim.x - 1 - blockIdx.x)) + threadIdx.x;
-  d_out[rowIdx + j] = s_data[threadIdx.x];
+  // but to the reversed block offset as tbefore
+  j = __brev(j);
+  //d_out[rowIdx + j] = s_data[threadIdx.x];
 }
 
 /*......Host Code......*/
@@ -311,7 +311,7 @@ void reverse(cplx buf[], int n)
 {
 	//Rearrange the array such that it can be iterated upon in the correct order
 	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
-	int i, j, len;
+	int i, j;
 	for (i = 1, j = 0; i < n; i++) 
 	{
 		int bit = n >> 1;
