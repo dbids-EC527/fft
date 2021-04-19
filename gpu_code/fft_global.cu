@@ -32,8 +32,8 @@ typedef double complex cplx;
 #define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
-#define BLOCK_DIM 	    1 //16
-#define GRID_DIM	      1 //128
+#define BLOCK_DIM 	    4 	//16
+#define GRID_DIM	    1   //128
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -97,30 +97,30 @@ void fft_2d(cplx buf[], int rowLen, int n);
 //   }
 // }
 
-__global__ void reverseArrayBlock(cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void reverseArrayBlockRow(int i, int rowLen, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  __shared__ int s_data[];
-
-  int i  = (blockDim.x * blockIdx.x) + threadIdx.x;
+  __shared__ cuDoubleComplex s_data[BLOCK_DIM*BLOCK_DIM];
+  int rowIdx = i*rowLen;
+  int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
 
   // Load one element per thread from device memory and store it 
   // *in reversed order* into temporary shared memory
-  s_data[blockDim.x - 1 - threadIdx.x] = d_in[i];
+  s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
 
   // Block until all threads in the block have written their data to shared memory
   __syncthreads();
 
   // write the data from shared memory in forward order, 
   // but to the reversed block offset as before
-  i = (blockDim.x * (gridDim.x - 1 - blockIdx.x)) + threadIdx.x;
-  d_out[i] = s_data[threadIdx.x];
+  j = (blockDim.x * (gridDim.x - 1 - blockIdx.x)) + threadIdx.x;
+  d_out[rowIdx + j] = s_data[threadIdx.x];
 }
 
 // FFT kernel per thread code
-__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data_in, cuDoubleComplex* data_out) 
+__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data) 
 {
   int i, j;
-  Interleave threads over a single block of the total array
+  //Interleave threads over a single block of the total array
   for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x)
   {
     for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
@@ -133,6 +133,7 @@ __global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data_in, cuDoubleComple
         //cuPrintf("data : (%f, %f) + (%f, %f)\n", cuCreal(data[i*rowLen+j]),\
         cuCimag(data[i*rowLen+j]),cuCreal(five), cuCimag(five));   
       }
+
     }
   __syncthreads();
   }
@@ -236,8 +237,11 @@ void runIteration(int rowLen)
   //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
   cuDoubleComplex* d_array_rev;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
-  reverseArrayBlock<<DimGrid, DimBlock>>(d_array_rev, d_array);
+  for(int i = 0; i < rowLen; i++)
+{
+  reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, d_array_rev, d_array);
   cudaDeviceSynchronize();
+}
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
