@@ -33,7 +33,7 @@ typedef double complex cplx;
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 #define BLOCK_DIM 	    4 	//16
-#define GRID_DIM	    1   //128
+#define GRID_DIM	      1   //128
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -49,22 +49,25 @@ void transpose(cplx buf[], int rowLen);
 void reverse(cplx buf[], int n);
 void reverse_2d(cplx buf[], int rowLen, int n);
 
-__global__ void reverseArrayBlockRow(int i, int rowLen, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void reverseArrayBlockRow(int i, int rowLen, int s, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  __shared__ cuDoubleComplex s_data[BLOCK_DIM];
   int rowIdx = i*rowLen;
-  int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
+  int j = blockIdx.x * (blockDim.x) + threadIdx.x;
+  d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+  //__shared__ cuDoubleComplex s_data[BLOCK_DIM];
+  
+  //int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
 
   // Load one element per thread from device memory and store it 
   // *in reversed order* into temporary shared memory
   //s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
-  s_data[threadIdx.x] = d_in[rowIdx + j];	
+  //s_data[threadIdx.x] = d_in[rowIdx + j];	
   // Block until all threads in the block have written their data to shared memory
-  __syncthreads();
+ // __syncthreads();
 
   // write the data from shared memory in forward order, 
   // but to the reversed block offset as tbefore
-  j = __brev(j);
+  //j = __brev(j);
   //d_out[rowIdx + j] = s_data[threadIdx.x];
 }
 
@@ -165,9 +168,10 @@ void runIteration(int rowLen)
   // Compute the mmm for each thread
   cuDoubleComplex* d_array_rev;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
+  int s = log2(n);
   for(int i = 0; i < rowLen; i++)
   {
-    reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, d_array_rev, d_array);
+    reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_rev, d_array);
     cudaDeviceSynchronize();
   }
 
