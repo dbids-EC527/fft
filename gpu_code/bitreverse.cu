@@ -28,8 +28,8 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
-#define PRINT_GPU
-#define PRINT_MATRIX
+//#define PRINT_GPU
+//#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 #define BLOCK_DIM 	      4   //16
@@ -49,13 +49,18 @@ void transpose(cplx buf[], int rowLen);
 void reverse(cplx buf[], int n);
 void reverse_2d(cplx buf[], int rowLen, int n);
 
+//Does bitwise reversal of a row of the overall matrix in the GPU
+//Uses coalesced memory accesses in global memory with possible thread divergence if matrix dimensions are poorly chosen
 __global__ void reverseArrayBlockRow(int i, int rowLen, int s, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   int rowIdx = i*rowLen;
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
-  if(j < rowLen)
-    d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
-  cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+  }
 }
 
 /*......Host Code......*/
@@ -117,7 +122,7 @@ void runIteration(int rowLen)
   printf("\t... done\n\n");
 
   //Copy double complex array to cuDoubleComplex array
-  cuDoubleComplex d[n];
+  cuDoubleComplex* d = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * n);
   for(int i = 0; i < n; i++)
   {
     double real_part = creal(h_array[i]);
