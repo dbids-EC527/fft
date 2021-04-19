@@ -32,8 +32,8 @@ typedef double complex cplx;
 #define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
-#define BLOCK_DIM 	    16
-#define GRID_DIM	      128
+#define BLOCK_DIM 	    1 //16
+#define GRID_DIM	      1 //128
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -62,7 +62,7 @@ __global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data)
     {
       for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
       {
-        //Reduce the current pixel
+        //FFT the current pixel
         if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
         {
           data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
@@ -111,8 +111,9 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaSetDevice(0));
 
   // Define size of matricies
-  size_t allocSize = rowLen * rowLen * sizeof(cplx);
-
+  size_t n = rowLen * rowLen;
+  size_t allocSize = n * sizeof(cplx);
+  
   // Allocate matricies on host memory
   cplx *h_array                    = (cplx *) malloc(allocSize);
   cplx *h_serial_array             = (cplx *) malloc(allocSize);
@@ -120,8 +121,8 @@ void runIteration(int rowLen)
   // Initialize the host arrays
   printf("\nInitializing the arrays ...");
   // Arrays are initialized with a known seed for reproducability
-  initializeArray(h_array, rowLen*rowLen, 2453);
-  initializeArray(h_serial_array, rowLen*rowLen, 2453);
+  initializeArray(h_array, n, 2453);
+  initializeArray(h_serial_array, n, 2453);
 #ifdef PRINT_MATRIX  
   printf("h_array:\n");
   printArray(rowLen, h_array);
@@ -130,32 +131,27 @@ void runIteration(int rowLen)
 #endif
   printf("\t... done\n\n");
 
-  // Allocate arrays on GPU global memory
-  //cplx *d_array;
-  //CUDA_SAFE_CALL(cudaMalloc((void **)&d_array, allocSize));
-  cuDoubleComplex* d_array;
-  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, rowLen*rowLen*sizeof(cuDoubleComplex)));
-
   //Copy double complex array to cuDoubleComplex array
-  cuDoubleComplex d[rowLen*rowLen];
-  for(int i = 0; i < rowLen*rowLen; i++)
+  cuDoubleComplex d[n];
+  for(int i = 0; i < n; i++)
   {
     double real_part = creal(h_array[i]);
     double imag_part = cimag(h_array[i]);
     d[i] = make_cuDoubleComplex(real_part, imag_part);
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
-  
-  //Transfer cuDoubleArray to device memory
-  CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
+
+  // Allocate arrays on GPU global memory
+  cuDoubleComplex* d_array;
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cuDoubleComplex)));
   
   // Start overall GPU timing
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
 
-  // Transfer the arrays to the GPU memory
-  //CUDA_SAFE_CALL(cudaMemcpy(d_array, h_array, allocSize, cudaMemcpyHostToDevice));
+  //Transfer cuDoubleArray to device memory
+  CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
 
   // Configure the kernel
   dim3 DimGrid(GRID_DIM, GRID_DIM, 1);    
@@ -187,7 +183,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(h_array, d_array, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -202,10 +198,19 @@ void runIteration(int rowLen)
   cudaEventDestroy(start);
   cudaEventDestroy(stop);
 
+  //Copy cuDoubleComplex array to double complex array  
+  for(int i = 0; i < n; i++)
+  {
+    double real_part = cuCreal(d[i]);
+    double imag_part = cuCimag(d[i]);
+    h_array[i] = real_part + I*imag_part;
+    CUDA_SAFE_CALL(cudaPeekAtLastError());
+  }
+
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
-  fft_2d(h_serial_array, rowLen, rowLen*rowLen);
+  fft_2d(h_serial_array, rowLen, n);
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
   printf("FFT_serial() took %f seconds\n", time_spent);
@@ -232,7 +237,7 @@ void runIteration(int rowLen)
   }
   
   if (errCount > 0) {
-    float percentError = ((float)errCount / (float)(rowLen*rowLen)) * 100.0;
+    float percentError = ((float)errCount / (float)(n)) * 100.0;
     printf("\n@ERROR: TEST FAILED: %d results did not match (%0.6f%%)\n", errCount, percentError);
   }
   else if (zeroCount > 0){
