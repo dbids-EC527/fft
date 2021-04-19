@@ -1,5 +1,5 @@
 /*
-    nvcc -arch sm_35 fft_global.cu ./base_code/fft_2d.c -o fft_global
+    nvcc -arch sm_35 fft_global.cu -o fft_global
 */
 
 #include <cstdio>
