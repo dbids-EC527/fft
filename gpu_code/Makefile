@@ -53,7 +53,7 @@ fft_2d.o : fft_2d.c fft_2d.h
 	$(CC) $(CC_FLAGS) -c fft_2d.c -o fft_2d.o
 
 # Compile CUDA source files to object files:
-fft_global.o : fft_global.cu cuPrintf.cu cuPrintf.cuh
+fft_global.o : fft_global.cu cuPrintf.cu cuPrintf.cuh fft_2d.h
 	$(NVCC) $(NVCC_FLAGS) -c fft_global.cu -o fft_global.o
 
 # Clean objects in object directory.

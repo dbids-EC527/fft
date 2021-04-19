@@ -13,7 +13,7 @@
 #include <cuComplex.h>
 
 //My own serial fft2d code
-#include "base_code/fft_2d.h"
+#include "fft_2d.h"
 
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
