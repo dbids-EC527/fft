@@ -28,11 +28,11 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
-//#define PRINT_GPU
+#define PRINT_GPU
 #define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
-#define BLOCK_DIM 	    4 	//16
+#define BLOCK_DIM 	      4   //16
 #define GRID_DIM	      1   //128
 
 #define CHECK_TOL          0.05
@@ -53,7 +53,11 @@ __global__ void reverseArrayBlockRow(int i, int rowLen, int s, cuDoubleComplex* 
 {
   int rowIdx = i*rowLen;
   int j = blockIdx.x * (blockDim.x) + threadIdx.x;
-  d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+  if(threadIdx.y == 0)
+  {
+    d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+    cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+  }
   //__shared__ cuDoubleComplex s_data[BLOCK_DIM];
   
   //int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
@@ -168,7 +172,7 @@ void runIteration(int rowLen)
   // Compute the mmm for each thread
   cuDoubleComplex* d_array_rev;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
-  int s = log2(n);
+  int s = (int)log2((float)rowLen);
   for(int i = 0; i < rowLen; i++)
   {
     reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_rev, d_array);
