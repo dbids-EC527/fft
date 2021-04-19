@@ -56,17 +56,16 @@ __global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data)
   int i, j, iters;
   
   //Interleave threads over a single block of the total array
-  for (iters = 0; iters < 2000; iters++) 
+  for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x)
   {
-    for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x)
+    for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
     {
-      for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
+    //FFT the current pixel
+      if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
       {
-        //FFT the current pixel
-        if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
-        {
-          data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
-        }
+        data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
+
+        //cuPrintf("data : (%f, %f) + (%f, %f)\n", cuCreal(data[i*rowLen+j]),cuCimag(data[i*rowLen+j]),cuCreal(five), cuCimag(five));   
       }
     }
   __syncthreads();
