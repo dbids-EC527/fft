@@ -32,8 +32,9 @@ typedef double complex cplx;
 //#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
-#define BLOCK_DIM 	      4   //16
-#define GRID_DIM	      1   //128
+//Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
+#define BLOCK_DIM 	      32   //Max of 32
+#define GRID_DIM	        1   //Keep it to 1
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -51,10 +52,14 @@ void reverse_2d(cplx buf[], int rowLen, int n);
 
 //Does bitwise reversal of a row of the overall matrix in the GPU
 //Uses coalesced memory accesses in global memory with possible thread divergence if matrix dimensions are poorly chosen
-__global__ void reverseArrayBlockRow(int i, int rowLen, int s, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void reverseArrayBlockRow(int i, int rowLen, int s,  d_out, cuDoubleComplex* d_in)
 {
   int rowIdx = i*rowLen;
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+
+  //Load the given index into shared memory
+  //__shared__ d_shared[]
+
   for(; j < rowLen; j += blockDim.x*gridDim.x)
   {  
     if(j < rowLen)
@@ -71,6 +76,7 @@ int main(int argc, char **argv)
     int rowLen = atoi(argv[1]);
     printf("Running code for %dx%d matrix\n", rowLen, rowLen);
     runIteration(rowLen);
+    printf("cuComplexDouble is %d bytes\n", sizeof(cuDoubleComplex));
   }
   else 
   {
