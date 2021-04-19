@@ -49,13 +49,78 @@ void transpose(cplx buf[], int rowLen);
 void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
-/*......CUDA Device Functions......*/
-// FFT kernel per thread code
-__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data) 
-{
-  int i, j, iters;
+// /*......CUDA Device Functions......*/
+// /**
+//  * Reorders array by bit-reversing the indexes.
+//  */
+//  __global__ void bitrev_reorder(Cplx* __restrict__ r, Cplx* __restrict__ d, int s, size_t nthr) {
+//   int id = blockIdx.x * nthr + threadIdx.x;
+//   r[__brev(id) >> (32 - s)] = d[id];
+// }
+
+// //Inner part of FFT loop. Contains the procedure itself.
+//  __device__ void inplace_fft_inner(Cplx* __restrict__ r, int j, int k, int m, int n) {
+//   if (j + k + m / 2 < n) { 
+//     Cplx t, u;
+    
+//     t.x = __cosf((2.0 * M_PI * k) / (1.0 * m));
+//     t.y = -__sinf((2.0 * M_PI * k) / (1.0 * m));
+    
+//     u = r[j + k];
+//     t = CplxMul(t, r[j + k + m / 2]);
+
+//     r[j + k] = CplxAdd(u, t);
+//     r[j + k + m / 2] = CplxAdd(u, CplxInv(t));
+//   }
+// }
+
+// /**
+//  * Middle part of FFT for small scope paralelism.
+//  */
+//  __global__ void inplace_fft(Cplx* __restrict__ r, int j, int m, int n, size_t nthr) {
+//   int k = blockIdx.x * nthr + threadIdx.x;
+//   inplace_fft_inner(r, j, k, m, n);
+// }
+
+// /**
+//  * Outer part of FFT for large scope paralelism.
+ 
+//  m = 2^iteration
+//  n = number of elements in matrix
+ 
+//  */
+// __global__ void inplace_fft_outer(Cplx* __restrict__ r, int m, int n, size_t nthr) {
+//   int j = (blockIdx.x * nthr + threadIdx.x) * m;
   
-  //Interleave threads over a single block of the total array
+//   for (int k = 0; k < m / 2; k++) {
+//     inplace_fft_inner(r, j, k, m, n);
+//   }
+// }
+
+__global__ void reverseArrayBlock(cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+{
+  __shared__ int s_data[];
+
+  int i  = (blockDim.x * blockIdx.x) + threadIdx.x;
+
+  // Load one element per thread from device memory and store it 
+  // *in reversed order* into temporary shared memory
+  s_data[blockDim.x - 1 - threadIdx.x] = d_in[i];
+
+  // Block until all threads in the block have written their data to shared memory
+  __syncthreads();
+
+  // write the data from shared memory in forward order, 
+  // but to the reversed block offset as before
+  i = (blockDim.x * (gridDim.x - 1 - blockIdx.x)) + threadIdx.x;
+  d_out[i] = s_data[threadIdx.x];
+}
+
+// FFT kernel per thread code
+__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data_in, cuDoubleComplex* data_out) 
+{
+  int i, j;
+  Interleave threads over a single block of the total array
   for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x)
   {
     for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
@@ -65,7 +130,8 @@ __global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data)
       {
         data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
 
-        //cuPrintf("data : (%f, %f) + (%f, %f)\n", cuCreal(data[i*rowLen+j]),cuCimag(data[i*rowLen+j]),cuCreal(five), cuCimag(five));   
+        //cuPrintf("data : (%f, %f) + (%f, %f)\n", cuCreal(data[i*rowLen+j]),\
+        cuCimag(data[i*rowLen+j]),cuCreal(five), cuCimag(five));   
       }
     }
   __syncthreads();
@@ -167,7 +233,10 @@ void runIteration(int rowLen)
   cudaEventRecord(start_kernel, 0);
 
   // Compute the mmm for each thread
-  FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
+  //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
+  cuDoubleComplex* d_array_rev;
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
+  reverseArrayBlock<<DimGrid, DimBlock>>(d_array_rev, d_array);
   cudaDeviceSynchronize();
 
   // End kernel timing
@@ -182,7 +251,8 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
+  //CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_rev, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
