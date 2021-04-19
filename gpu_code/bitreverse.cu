@@ -52,27 +52,10 @@ void reverse_2d(cplx buf[], int rowLen, int n);
 __global__ void reverseArrayBlockRow(int i, int rowLen, int s, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   int rowIdx = i*rowLen;
-  int j = blockIdx.x * (blockDim.x) + threadIdx.x;
-  if(threadIdx.y == 0)
-  {
+  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+  if(j < rowLen)
     d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
-    cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
-  }
-  //__shared__ cuDoubleComplex s_data[BLOCK_DIM];
-  
-  //int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
-
-  // Load one element per thread from device memory and store it 
-  // *in reversed order* into temporary shared memory
-  //s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
-  //s_data[threadIdx.x] = d_in[rowIdx + j];	
-  // Block until all threads in the block have written their data to shared memory
- // __syncthreads();
-
-  // write the data from shared memory in forward order, 
-  // but to the reversed block offset as tbefore
-  //j = __brev(j);
-  //d_out[rowIdx + j] = s_data[threadIdx.x];
+  cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
 }
 
 /*......Host Code......*/
