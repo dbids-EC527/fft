@@ -1,5 +1,6 @@
 /*
     nvcc -arch sm_35 bitreverse.cu -o bitreverse
+    nvcc -arch compute_70 -code sm_70 bitreverse.cu -o bitreverse  
 */
 
 #include <cstdio>
@@ -60,21 +61,22 @@ __global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex*
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
   //Load the given index into shared memory and do the bit order reversal in the time domain
-  __shared__ d_shared[rowLen];
+  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
   for(; j < rowLen; j += blockDim.x*gridDim.x)
   {  
     if(j < rowLen)
-      d_shared[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
-    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
+      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
   }
   __syncthreads();
 
   //Copy the data back out
-  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
   {  
     if(j < rowLen)
-      d_out[j + rowIdx] = d_shared[j + rowIdx];
+      d_out[j + rowIdx] = d_shared[j];
     //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
   }
 }
 
