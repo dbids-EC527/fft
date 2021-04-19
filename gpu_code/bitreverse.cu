@@ -59,13 +59,21 @@ __global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex*
   int rowIdx = i*rowLen;
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
-  //Load the given index into shared memory
+  //Load the given index into shared memory and do the bit order reversal in the time domain
   __shared__ d_shared[rowLen];
-
   for(; j < rowLen; j += blockDim.x*gridDim.x)
   {  
     if(j < rowLen)
-      d_out[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+      d_shared[(__brev(j) >> (32 - s)) + rowIdx] = d_in[j + rowIdx];
+    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+  }
+  __syncthreads();
+
+  //Copy the data back out
+  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_out[j + rowIdx] = d_shared[j + rowIdx];
     //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
   }
 }
@@ -104,6 +112,13 @@ void runIteration(int rowLen)
   //Define local vars for checking correctness
   int i, j, errCount = 0, zeroCount = 0;
   double currDiff, maxDiff = 0;
+
+   //Check that row can fit into SM
+   if(rowLen > MAX_SM_ELEM_NUM)
+   {
+     fprintf(stderr, "The specified array will not work with shared memory\n");
+     exit(EXIT_FAILURE);
+   } 
 
   // Select GPU
   CUDA_SAFE_CALL(cudaSetDevice(0));
