@@ -146,7 +146,7 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* 
   __syncthreads();
 
   //Do the FFT itself for the row
-  cuDoubleComplex wlen, w, u, v;
+  /*cuDoubleComplex wlen, w, u, v;
   int len, i, j;
   for (len = 2; len <= rowLen; len <<= 1)
   {
@@ -168,13 +168,12 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* 
 		}
     __syncthreads();
   }
-  __syncthreads();
+  __syncthreads();*/
 
   //Copy the data back out
   for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
   {  
-    if(j < rowLen)
-      d_out[j + rowIdx] = d_shared[j];
+    d_out[j + rowIdx] = d_shared[j];
     //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
     //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
   } 
