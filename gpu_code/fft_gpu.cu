@@ -130,18 +130,18 @@ void fft_2d(cplx buf[], int rowLen, int n);
 
 // FFT kernel per SM code
 //Need to remove gridDim stuff if we do one block per row
-__global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double PI) 
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
 {
-  int rowIdx = i*rowLen;
-  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+  int rowSz = rowIdx*rowLen;
+  int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
   //Load the given index into shared memory and do the bit order reversal in the time domain
   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  for(; colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
   {  
-    if(j < rowLen)
-      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
-      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+    if(colIdx < rowLen)
+      d_shared[(__brev(colIdx) >> (32 - s))] = d_in[colIdx + rowSz];
+      //cuPrintf("j was :%d and oidx was %d\n", colIdx, (__brev(colIdx) >> (32 - s)));
   }
   __syncthreads();
 
@@ -150,7 +150,7 @@ __global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out
   int len, i, j;
   for (len = 2; len <= rowLen; len <<= 1)
   {
-    double ang = 2 * PI / len;
+    double ang = 2 * pi / len;
     wlen = make_cuDoubleComplex(cos(ang), sin(ang));
 
     for (i = (blockIdx.x * blockDim.x + threadIdx.x)*len; i < rowLen; i += (blockDim.x*gridDim.x*len));
@@ -168,6 +168,16 @@ __global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out
 		}
     __syncthreads();
   }
+  __syncthreads();
+
+  //Copy the data back out
+  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_out[j + rowIdx] = d_shared[j];
+    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
+  } 
 }
 
 /*......Host Code......*/
