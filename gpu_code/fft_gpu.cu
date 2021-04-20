@@ -171,11 +171,11 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* 
   __syncthreads();*/
 
   //Copy the data back out
-  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
+  for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
   {  
-    d_out[j + rowIdx] = d_shared[j];
-    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
-    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
+    d_out[colIdx + rowSz] = d_shared[colIdx];
+    //cuPrintf("colIdx was :%d and oidx was %d\n", colIdx, (__brev(colIdx) >> (32 - s)));
+    //cuPrintf("d_shared[%d] = (%f, %f)\n", colIdx, cuCreal(d_shared[colIdx]), cuCreal(d_shared[colIdx]));
   } 
 }
 
