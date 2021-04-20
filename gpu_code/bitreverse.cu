@@ -115,12 +115,12 @@ void runIteration(int rowLen)
   int i, j, errCount = 0, zeroCount = 0;
   double currDiff, maxDiff = 0;
 
-   //Check that row can fit into SM
-   if(rowLen > MAX_SM_ELEM_NUM)
-   {
-     fprintf(stderr, "The specified array will not work with shared memory\n");
-     exit(EXIT_FAILURE);
-   } 
+  //Check that row can fit into SM
+  if(rowLen > MAX_SM_ELEM_NUM)
+  {
+    fprintf(stderr, "The specified array will not work with shared memory\n");
+    exit(EXIT_FAILURE);
+  } 
 
   // Select GPU
   CUDA_SAFE_CALL(cudaSetDevice(0));
@@ -182,7 +182,7 @@ void runIteration(int rowLen)
   cudaEventCreate(&stop_kernel);
   cudaEventRecord(start_kernel, 0);
 
-  // Compute the mmm for each thread
+  // Compute the rev for each thread
   cuDoubleComplex* d_array_rev;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
   int s = (int)log2((float)rowLen);
@@ -280,6 +280,7 @@ void runIteration(int rowLen)
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
+  CUDA_SAFE_CALL(cudaFree(d_array_rev));
   free(h_serial_array);
   free(h_array);
 

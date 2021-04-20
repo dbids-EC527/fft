@@ -1,5 +1,6 @@
 /*
-    nvcc -arch sm_35 fft_global.cu -o fft_global
+    nvcc -arch sm_35 fft_gpu.cu -o fft_gpu
+    nvcc -arch compute_70 -code sm_70 fft_gpu.cu -o fft_gpu
 */
 
 #include <cstdio>
@@ -32,8 +33,11 @@ typedef double complex cplx;
 #define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
-#define BLOCK_DIM 	    4 	//16
-#define GRID_DIM	    1   //128
+//Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
+//cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
+#define MAX_SM_ELEM_NUM	      3072
+#define BLOCK_DIM 	      32   //Max of 32
+#define GRID_DIM	      1   //Keep it to 1
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -97,46 +101,51 @@ void fft_2d(cplx buf[], int rowLen, int n);
 //   }
 // }
 
-__global__ void reverseArrayBlockRow(int i, int rowLen, cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+//Does bitwise reversal of a row of the overall matrix in the GPU
+//Uses coalesced memory accesses in global memory with possible thread divergence if matrix dimensions are poorly chosen
+__global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  __shared__ cuDoubleComplex s_data[BLOCK_DIM*BLOCK_DIM];
   int rowIdx = i*rowLen;
-  int j  = (blockDim.x * blockIdx.x) + threadIdx.x;
+  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
-  // Load one element per thread from device memory and store it 
-  // *in reversed order* into temporary shared memory
-  s_data[blockDim.x - 1 - threadIdx.x] = d_in[rowIdx + j];
-
-  // Block until all threads in the block have written their data to shared memory
+  //Load the given index into shared memory and do the bit order reversal in the time domain
+  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
+  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
+      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+  }
   __syncthreads();
 
-  // write the data from shared memory in forward order, 
-  // but to the reversed block offset as before
-  j = (blockDim.x * (gridDim.x - 1 - blockIdx.x)) + threadIdx.x;
-  d_out[rowIdx + j] = s_data[threadIdx.x];
+  //Copy the data back out
+  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_out[j + rowIdx] = d_shared[j];
+    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
+  }
 }
 
 // FFT kernel per thread code
-__global__ void FFT_Kernel (int rowLen, cuDoubleComplex* data) 
+__global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in) 
 {
-  int i, j;
-  //Interleave threads over a single block of the total array
-  for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x)
-  {
-    for (j = blockIdx.y * blockDim.y + threadIdx.y; j < rowLen; j += blockDim.y*gridDim.y)
-    {
-    //FFT the current pixel
-      if(i>0 && i<rowLen-1 && j>0 && j<rowLen-1)
-      {
-        data[i*rowLen+j] = cuCadd(data[i*rowLen+j], make_cuDoubleComplex(5, 0));
+  int rowIdx = i*rowLen;
+  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
-        //cuPrintf("data : (%f, %f) + (%f, %f)\n", cuCreal(data[i*rowLen+j]),\
-        cuCimag(data[i*rowLen+j]),cuCreal(five), cuCimag(five));   
-      }
-
-    }
-  __syncthreads();
+  //Load the given index into shared memory and do the bit order reversal in the time domain
+  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
+  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  {  
+    if(j < rowLen)
+      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
+      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
   }
+  __syncthreads();
+
+  //Do the FFT itself for the row
+  for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x);
 }
 
 /*......Host Code......*/
@@ -171,7 +180,14 @@ void runIteration(int rowLen)
 
   //Define local vars for checking correctness
   int i, j, errCount = 0, zeroCount = 0;
-  float currDiff, maxDiff = 0;
+  double currDiff, maxDiff = 0;
+
+  //Check that row can fit into SM
+  if(rowLen > MAX_SM_ELEM_NUM)
+  {
+    fprintf(stderr, "The specified array will not work with shared memory\n");
+    exit(EXIT_FAILURE);
+  } 
 
   // Select GPU
   CUDA_SAFE_CALL(cudaSetDevice(0));
@@ -198,7 +214,7 @@ void runIteration(int rowLen)
   printf("\t... done\n\n");
 
   //Copy double complex array to cuDoubleComplex array
-  cuDoubleComplex d[n];
+  cuDoubleComplex* d = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * n);
   for(int i = 0; i < n; i++)
   {
     double real_part = creal(h_array[i]);
@@ -209,7 +225,9 @@ void runIteration(int rowLen)
 
   // Allocate arrays on GPU global memory
   cuDoubleComplex* d_array;
+  cuDoubleComplex* d_array_out;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cuDoubleComplex)));
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
   
   // Start overall GPU timing
   cudaEventCreate(&start);
@@ -233,15 +251,14 @@ void runIteration(int rowLen)
   cudaEventCreate(&stop_kernel);
   cudaEventRecord(start_kernel, 0);
 
-  // Compute the mmm for each thread
+  // Compute the fft for each thread
   //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
-  cuDoubleComplex* d_array_rev;
-  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
+  int s = (int)log2((float)rowLen);
   for(int i = 0; i < rowLen; i++)
-{
-  reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, d_array_rev, d_array);
-  cudaDeviceSynchronize();
-}
+  {
+    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
+    cudaDeviceSynchronize();
+  }
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
@@ -255,8 +272,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  //CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
-  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_rev, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_out, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -295,11 +311,20 @@ void runIteration(int rowLen)
   printf("serial code:\n");
   printArray(rowLen, h_serial_array);
 #endif
-  /*for(i = 0; i < rowLen; i++) {
+  for(i = 0; i < rowLen; i++) {
     for(j = 0; j < rowLen; j++)
     {
-        currDiff = abs(h_serial_array[i] - h_array[i]);
-	      maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
+        currDiff = abs(creal(h_serial_array[i]) - creal(h_array[i]));
+        maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
+        if (currDiff > CHECK_TOL) {
+            errCount++;
+        }
+        if (h_array[i] == 0) {
+            zeroCount++;
+        }
+
+        currDiff = abs(cimag(h_serial_array[i]) - cimag(h_array[i]));
+        maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
         if (currDiff > CHECK_TOL) {
             errCount++;
         }
@@ -309,20 +334,9 @@ void runIteration(int rowLen)
     }
   }
   
-  if (errCount > 0) {
-    float percentError = ((float)errCount / (float)(n)) * 100.0;
-    printf("\n@ERROR: TEST FAILED: %d results did not match (%0.6f%%)\n", errCount, percentError);
-  }
-  else if (zeroCount > 0){
-    printf("\n@ERROR: TEST FAILED: %d results (from GPU) are zero\n", zeroCount);
-  }
-  else {
-    printf("\nTEST PASSED: All results matched\n");
-  }
-  printf("MAX_DIFFERENCE = %f between serial and GPU code\n\n", maxDiff);*/
-  
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
+  CUDA_SAFE_CALL(cudaFree(d_array_out));
   free(h_serial_array);
   free(h_array);
 
