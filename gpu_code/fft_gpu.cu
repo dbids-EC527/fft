@@ -29,8 +29,8 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
-#define PRINT_GPU
-#define PRINT_MATRIX
+//#define PRINT_GPU
+//#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
@@ -79,7 +79,6 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
   {
     double ang = 2 * pi / len;
     wlen = make_cuDoubleComplex(cos(ang), sin(ang));
-    cuPrintf("len: %d, wlen: (%f, %f)\n", len, cuCreal(wlen), cuCimag(wlen));
     //for (i = (blockIdx.x * blockDim.x + threadIdx.x)*len; i < rowLen; i += (blockDim.x*gridDim.x*len));
     for (i = 0; i < rowLen; i += len)
 		{
@@ -312,12 +311,10 @@ void runIteration(int rowLen)
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
-  for(int i = 0; i < rowLen; i++)
-    fft(h_serial_array, rowLen);
-  //fft_2d(h_serial_array, rowLen, n);
+  fft_2d(h_serial_array, rowLen, n);
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
-  printf("FFT_serial() took %f seconds\n", time_spent);
+  printf("FFT_serial() took %f (msec)\n", time_spent*1000);
 
   // Compare the results
 #ifdef PRINT_MATRIX
@@ -348,6 +345,17 @@ void runIteration(int rowLen)
         }
     }
   }
+  if (errCount > 0) {
+    float percentError = ((float)errCount / (float)(n)) * 100.0;
+    printf("\n@ERROR: TEST FAILED: %d results did not match (%0.6f%%)\n", errCount, percentError);
+  }
+  else if (zeroCount > 0){
+    printf("\n@ERROR: TEST FAILED: %d results (from GPU) are zero\n", zeroCount);
+  }
+  else {
+    printf("\nTEST PASSED: All results matched\n");
+  }
+  printf("MAX_DIFFERENCE = %f between serial and GPU code\n\n", maxDiff);
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
@@ -431,8 +439,6 @@ void fft(cplx buf[], int n)
 		double ang = 2 * PI / len;
 		wlen = cexp(I * ang);
 		
-		printf("len: %d, wlen:(%f, %f)\n", len, creal(wlen), cimag(wlen));
-
 		/* i goes from 0 to n with stride len
 		j goes from 0 to len/2 in stride 1
 
