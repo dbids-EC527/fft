@@ -130,7 +130,7 @@ void fft_2d(cplx buf[], int rowLen, int n);
 
 // FFT kernel per SM code
 //Need to remove gridDim stuff if we do one block per row
-__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
 {
   int rowSz = rowIdx*rowLen;
   int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
@@ -139,14 +139,12 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* 
   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
   for(; colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
   {  
-    if(colIdx < rowLen)
-      d_shared[(__brev(colIdx) >> (32 - s))] = d_in[colIdx + rowSz];
-      //cuPrintf("j was :%d and oidx was %d\n", colIdx, (__brev(colIdx) >> (32 - s)));
+    d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
   }
   __syncthreads();
 
   //Do the FFT itself for the row
-  /*cuDoubleComplex wlen, w, u, v;
+  cuDoubleComplex wlen, w, u, v;
   int len, i, j;
   for (len = 2; len <= rowLen; len <<= 1)
   {
@@ -168,14 +166,12 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int s,  cuDoubleComplex* 
 		}
     __syncthreads();
   }
-  __syncthreads();*/
+  __syncthreads();
 
-  //Copy the data back out
+  //Copy the data from shared memory to output
   for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
   {  
     d_out[colIdx + rowSz] = d_shared[colIdx];
-    //cuPrintf("colIdx was :%d and oidx was %d\n", colIdx, (__brev(colIdx) >> (32 - s)));
-    //cuPrintf("d_shared[%d] = (%f, %f)\n", colIdx, cuCreal(d_shared[colIdx]), cuCreal(d_shared[colIdx]));
   } 
 }
 
