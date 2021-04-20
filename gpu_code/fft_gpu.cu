@@ -103,33 +103,34 @@ void fft_2d(cplx buf[], int rowLen, int n);
 
 //Does bitwise reversal of a row of the overall matrix in the GPU
 //Uses coalesced memory accesses in global memory with possible thread divergence if matrix dimensions are poorly chosen
-__global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
-{
-  int rowIdx = i*rowLen;
-  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+// __global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+// {
+//   int rowIdx = i*rowLen;
+//   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
-  //Load the given index into shared memory and do the bit order reversal in the time domain
-  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; j < rowLen; j += blockDim.x*gridDim.x)
-  {  
-    if(j < rowLen)
-      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
-      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
-  }
-  __syncthreads();
+//   //Load the given index into shared memory and do the bit order reversal in the time domain
+//   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
+//   for(; j < rowLen; j += blockDim.x*gridDim.x)
+//   {  
+//     if(j < rowLen)
+//       d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
+//       //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+//   }
+//   __syncthreads();
 
-  //Copy the data back out
-  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
-  {  
-    if(j < rowLen)
-      d_out[j + rowIdx] = d_shared[j];
-    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
-    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
-  }
-}
+//   //Copy the data back out
+//   for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
+//   {  
+//     if(j < rowLen)
+//       d_out[j + rowIdx] = d_shared[j];
+//     //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+//     //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
+//   }
+// }
 
-// FFT kernel per thread code
-__global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in) 
+// FFT kernel per SM code
+//Need to remove gridDim stuff if we do one block per row
+__global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double PI) 
 {
   int rowIdx = i*rowLen;
   int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
@@ -145,7 +146,28 @@ __global__ void FFT_Kernel_Row(int i, int rowLen, int s,  cuDoubleComplex* d_out
   __syncthreads();
 
   //Do the FFT itself for the row
-  for (i = blockIdx.x * blockDim.x + threadIdx.x; i < rowLen; i += blockDim.x*gridDim.x);
+  cuDoubleComplex wlen, w, u, v;
+  int len, i, j;
+  for (len = 2; len <= rowLen; len <<= 1)
+  {
+    double ang = 2 * PI / len;
+    wlen = make_cuDoubleComplex(cos(ang), sin(ang));
+
+    for (i = (blockIdx.x * blockDim.x + threadIdx.x)*len; i < rowLen; i += (blockDim.x*gridDim.x*len));
+		{
+			w = make_cuDoubleComplex(1, 0);
+			for (j = 0; j < (len / 2); j++) 
+			{
+				//Compute the DFT on the correct elements
+				u = d_shared[i+j];
+				v = cuCmul(d_shared[i+j+(len/2)], w);
+				d_shared[i+j] = cuCadd(u, v);
+				d_shared[i+j+(len/2)] = cuCsub(u, v);
+				w = cuCmul(w, wlen);
+			}
+		}
+    __syncthreads();
+  }
 }
 
 /*......Host Code......*/
@@ -256,7 +278,7 @@ void runIteration(int rowLen)
   int s = (int)log2((float)rowLen);
   for(int i = 0; i < rowLen; i++)
   {
-    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
+    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array, PI);
     cudaDeviceSynchronize();
   }
 
@@ -411,7 +433,7 @@ void fft(cplx buf[], int n)
 	cplx wlen, w, u, v;
 	// len goes 2, 4, ... n/2, n
 	// len iterates over the array log2(n) times
-  	for (len = 2; len <= n; len <<= 1) 
+  for (len = 2; len <= n; len <<= 1) 
 	{
 		double ang = 2 * PI / len;
 		wlen = cexp(I * ang);
