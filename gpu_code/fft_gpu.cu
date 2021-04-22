@@ -29,8 +29,8 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
-//#define PRINT_GPU
-//#define PRINT_MATRIX
+#define PRINT_GPU
+#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
@@ -58,8 +58,8 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 {
   cuDoubleComplex wlen, w, u, v;
   int len, i, j;
-  if (threadIdx.x == 0 && threadIdx.y == 0)
-  {
+  //if (threadIdx.x == 0 && threadIdx.y == 0)
+  //{
   for (len = 2; len <= rowLen; len <<= 1)
   {
     double ang = 2 * pi / len;
@@ -69,9 +69,9 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
     for (i = 0; i < rowLen; i += len)
 		{
 			w = make_cuDoubleComplex(1, 0);
-			//j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
-			//for (; j < (len / 2); j += blockDim.x*blockDim.y)
-			for (j = 0; j < (len / 2); j++) 
+			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
+			for (; j < (len / 2); j += blockDim.x*blockDim.y)
+			//for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
 				u = d_shared[i+j];
@@ -79,11 +79,14 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
 				w = cuCmul(w, wlen);
+				//cuPrintf("len is %d i is %d j is %d\n", leni, i, j);
+				cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 			}
+			__syncthreads();
 		}
-    //__syncthreads();
+    __syncthreads();
   }
-  }
+  //}
 }
 
 // FFT kernel per SM code
@@ -445,6 +448,8 @@ void fft(cplx buf[], int n)
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
 				w *= wlen;
+			//	printf("len is %d i is %d j is %d\n", len, i, j);
+				printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 			}
 		}
   }
