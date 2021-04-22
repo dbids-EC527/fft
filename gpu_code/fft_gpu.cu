@@ -54,7 +54,7 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 /*......CUDA Device Functions......*/
-__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
+__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi)
 {
   cuDoubleComplex wlen, w, u, v;
   int len, i, j;
@@ -64,10 +64,13 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
   {
     double ang = 2 * pi / len;
     wlen = make_cuDoubleComplex(cos(ang), sin(ang));
-    //for (i = (blockIdx.x * blockDim.x + threadIdx.x)*len; i < rowLen; i += (blockDim.x*gridDim.x*len));
+    //i = (blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y))*len;
+    //for (; i < rowLen; i += (blockDim.x*gridDim.x)*len)
     for (i = 0; i < rowLen; i += len)
 		{
 			w = make_cuDoubleComplex(1, 0);
+			//j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
+			//for (; j < (len / 2); j += blockDim.x*blockDim.y)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
@@ -92,18 +95,18 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
 
   //Load the given index into shared memory and do the bit order reversal in the time domain
   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
+  for(; colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
   {  
     d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
   }
   __syncthreads();
 
   //Do the FFT itself for the row
-  InnerFFT(rowLen, &d_shared[0]);
+  InnerFFT(rowLen, &d_shared[0], pi);
   __syncthreads();
 
   //Copy the data from shared memory to output
-  for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
+  for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
   {  
     d_out[colIdx + rowSz] = d_shared[colIdx];
   } 
@@ -117,18 +120,18 @@ __global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComple
 
   //Load the given index into shared memory and do the bit order reversal in the time domain
   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; rowIdx < rowLen; rowIdx += blockDim.y*gridDim.y)
+  for(; rowIdx < rowLen; rowIdx += blockDim.y*blockDim.y)
   {  
     d_shared[(__brev(rowIdx) >> (32 - logn))] = d_in[rowIdx*rowLen + colIdx];
   }
   __syncthreads();
 
   //Do the FFT itself for the column
-  InnerFFT(rowLen, &d_shared[0]);
+  InnerFFT(rowLen, &d_shared[0], pi);
   __syncthreads();
 
   //Copy the data from shared memory to output
-  for(rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*gridDim.y)
+  for(rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*blockDim.x)
   {  
     d_out[rowIdx*rowLen + colIdx] = d_shared[rowIdx];
   } 
