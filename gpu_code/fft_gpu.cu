@@ -54,23 +54,8 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 /*......CUDA Device Functions......*/
-
-// FFT kernel per SM code
-//Need to remove gridDim stuff if we do one block per row
-__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
+__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
-  int rowSz = rowIdx*rowLen;
-  int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
-
-  //Load the given index into shared memory and do the bit order reversal in the time domain
-  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
-  {  
-    d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
-  }
-  __syncthreads();
-
-  //Do the FFT itself for the row
   cuDoubleComplex wlen, w, u, v;
   int len, i, j;
   if (threadIdx.x == 0 && threadIdx.y == 0)
@@ -96,6 +81,25 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
     //__syncthreads();
   }
   }
+}
+
+// FFT kernel per SM code
+//Need to remove gridDim stuff if we do one block per row
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
+{
+  int rowSz = rowIdx*rowLen;
+  int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+
+  //Load the given index into shared memory and do the bit order reversal in the time domain
+  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
+  for(; colIdx < rowLen; colIdx += blockDim.x*gridDim.x)
+  {  
+    d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
+  }
+  __syncthreads();
+
+  //Do the FFT itself for the row
+  InnerFFT(rowLen, &d_shared[0]);
   __syncthreads();
 
   //Copy the data from shared memory to output
@@ -119,33 +123,8 @@ __global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComple
   }
   __syncthreads();
 
-  //Do the FFT itself for the array
-  cuDoubleComplex wlen, w, u, v;
-  int len, i, j;
-  if (threadIdx.x == 0 && threadIdx.y == 0)
-  {
-  for (len = 2; len <= rowLen; len <<= 1)
-  {
-    double ang = 2 * pi / len;
-    wlen = make_cuDoubleComplex(cos(ang), sin(ang));
-    cuPrintf("len: %d, wlen: (%f, %f)\n", len, cuCreal(wlen), cuCimag(wlen));
-    //for (i = (blockIdx.x * blockDim.x + threadIdx.x)*len; i < rowLen; i += (blockDim.x*gridDim.x*len));
-    for (i = 0; i < rowLen; i += len)
-		{
-			w = make_cuDoubleComplex(1, 0);
-			for (j = 0; j < (len / 2); j++) 
-			{
-				//Compute the DFT on the correct elements
-				u = d_shared[i+j];
-				v = cuCmul(d_shared[i+j+(len/2)], w);
-				d_shared[i+j] = cuCadd(u, v);
-				d_shared[i+j+(len/2)] = cuCsub(u, v);
-				w = cuCmul(w, wlen);
-			}
-		}
-    //__syncthreads();
-  }
-  }
+  //Do the FFT itself for the column
+  InnerFFT(rowLen, &d_shared[0]);
   __syncthreads();
 
   //Copy the data from shared memory to output
