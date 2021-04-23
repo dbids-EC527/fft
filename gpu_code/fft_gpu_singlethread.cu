@@ -428,11 +428,8 @@ void fft(cplx buf[], int n)
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
 				w *= wlen;
-			//	printf("len is %d i is %d j is %d\n", len, i, j);
-			//	printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 			}
 		}
-		printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));
   }
 }
 
