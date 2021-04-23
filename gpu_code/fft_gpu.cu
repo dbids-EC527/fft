@@ -79,11 +79,12 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
 				w = cuCmul(w, wlen);
-				//cuPrintf("len is %d i is %d j is %d\n", leni, i, j);
+				cuPrintf("len is %d i is %d j is %d\n", len, i, j);
 				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 				if(firstRow)
 				cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
 	 cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3]), cuCimag(d_shared[3])); 
+			//__syncthreads();
 			}
 			__syncthreads();
 		}
@@ -235,7 +236,7 @@ void runIteration(int rowLen)
 
   // Configure the kernel
   dim3 DimGrid(GRID_DIM, GRID_DIM, 1);    
-  dim3 DimBlock(BLOCK_DIM, BLOCK_DIM, 1); 
+  dim3 DimBlock(2, 2, 1); 
   printf("Kernal code launching\n");
 
 #ifdef PRINT_GPU
@@ -315,13 +316,13 @@ void runIteration(int rowLen)
   for(i = 0; i < rowLen; i++) {
     for(j = 0; j < rowLen; j++)
     {
-        currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
-	currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
-        maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
-	maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
-        if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
-            errCount++;	    
-        }
+      currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
+      currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
+      maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
+      maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
+      if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
+        errCount++;	    
+      }
     }
   }
   if (errCount > 0) {
@@ -439,7 +440,7 @@ void fft(cplx buf[], int n)
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
 				w *= wlen;
-			//	printf("len is %d i is %d j is %d\n", len, i, j);
+				printf("len is %d i is %d j is %d\n", len, i, j);
 			//	printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 			}
 		}
