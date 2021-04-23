@@ -393,7 +393,7 @@ void fft(cplx buf[], int n)
   }
 
 	/*Compute the FFT for the array*/
-	cplx wlen, w, u, v;
+	cplx w, u, v;
 	// len goes 2, 4, ... n/2, n
 	// len iterates over the array log2(n) times
   for (len = 2; len <= n; len <<= 1) 
@@ -418,7 +418,7 @@ void fft(cplx buf[], int n)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-				wlen = cexp(I * ang * j);
+				w = cexp(I * ang * j);
         u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
 				buf[i+j] = u + v;
