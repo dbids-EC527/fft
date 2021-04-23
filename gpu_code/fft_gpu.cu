@@ -62,23 +62,25 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
   for (len = 2; len <= rowLen; len <<= 1)
   {
     double ang = 2 * M_PI / len;
-    wlen = make_cuDoubleComplex(cos(ang), sin(ang));
+    //wlen = make_cuDoubleComplex(cos(ang), sin(ang));
     //i = (blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y))*len;
     //for (; i < rowLen; i += (blockDim.x*gridDim.x)*len)
     for (i = 0; i < rowLen; i += len)
 		{
-			w = make_cuDoubleComplex(1, 0);
+			//w = make_cuDoubleComplex(1, 0);
 			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
       __syncthreads();
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
 			//for (j = 0; j < (len / 2); j++) 
 			{
+				w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				//Compute the DFT on the correct elements
 				u = d_shared[i+j];
 				v = cuCmul(d_shared[i+j+(len/2)], w);
+				cuPrintf("w is %f and v is %f\n", w, v);
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
-				w = cuCmul(w, wlen);
+				//w = cuCmul(w, wlen);
 				cuPrintf("len is %d i is %d j is %d\n", len, i, j);
 				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 				cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
@@ -210,7 +212,7 @@ void runIteration(int rowLen)
 
   //Copy double complex array to cuDoubleComplex array
   cuDoubleComplex* d = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * n);
-  for(int i = 0; i < n; i++)
+  for(i = 0; i < n; i++)
   {
     double real_part = creal(h_array[i]);
     double imag_part = cimag(h_array[i]);
@@ -251,6 +253,7 @@ void runIteration(int rowLen)
   int s = (int)log2((float)rowLen);
   //for(int i = 0; i < rowLen; i++)
   //{
+    i = 0;
     FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
     cudaDeviceSynchronize();
   //}
@@ -272,7 +275,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_out, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -288,7 +291,7 @@ void runIteration(int rowLen)
   cudaEventDestroy(stop);
 
   //Copy cuDoubleComplex array to double complex array  
-  for(int i = 0; i < n; i++)
+  for(i = 0; i < n; i++)
   {
     double real_part = cuCreal(d[i]);
     double imag_part = cuCimag(d[i]);
@@ -301,14 +304,17 @@ void runIteration(int rowLen)
   clock_gettime(CLOCK_REALTIME, &time_start);
   //fft_2d(h_serial_array, rowLen, n);
 
-  cplx* firstRow = malloc(sizeof(cplx) * rowLen);
-  firstRow = memcpy(firstRow, h_serial_array, sizeof(cplx) * rowLen);
-  fft(firstRow, n);
-
+  cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
+  for(i = 0; i < rowLen; i++)
+	firstRow[i] = h_serial_array[i];
+  fft(firstRow, rowLen);
+  for(i = 0; i < rowLen; i++)
+	h_serial_array[i] = firstRow[i];
+  free(firstRow);
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
   printf("FFT_serial() took %f (msec)\n", time_spent*1000);
-
+  
   // Compare the results
 #ifdef PRINT_MATRIX
   printf("GPU code:\n");
@@ -440,14 +446,16 @@ void fft(cplx buf[], int n)
 				//Compute the DFT on the correct elements
 				u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
+				printf("w is %f and v is %f\n", w, v);
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
 				w *= wlen;
 				printf("len is %d i is %d j is %d\n", len, i, j);
 			//	printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
+				printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));   
 			}
 		}
-		printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));
+		//printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));
   }
 }
 
