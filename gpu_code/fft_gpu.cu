@@ -399,6 +399,65 @@ void fft(cplx buf[], int n)
   for (len = 2; len <= n; len <<= 1) 
 	{
 		double ang = 2 * M_PI / len;
+
+		/* i goes from 0 to n with stride len
+		j goes from 0 to len/2 in stride 1
+
+		The sum of i+j is used to index into the buffer 
+		and determine the correct indexes at which to perform the DFT.
+		For example if n = 8:
+		For the first iteration len = 2, i = 0,2,4,8, j = 0 so that i + j = 0,2,4,8.  
+		For the second iteration len = 4, i = 0,4, j = 0,1  so that i + j = 0,1,4,5.  
+		For the final iteration len = 8, i = 0, j = 0,1,2,3 so that i + j = 0,1,2,3.
+		This allows us to DFT properly for each index based on the conceptual algorithm.
+
+		For each iteration of there are n/2 iterations as shown above,
+		*/
+		for (i = 0; i < n; i += len) 
+		{
+			for (j = 0; j < (len / 2); j++) 
+			{
+				//Compute the DFT on the correct elements
+				wlen = cexp(I * ang * j);
+        u = buf[i+j];
+				v = buf[i+j+(len/2)] * w;
+				buf[i+j] = u + v;
+				buf[i+j+(len/2)] = u - v;
+			}
+		}
+  }
+}
+
+/* Performs in place FFT on buf of size n*/
+void fft_wlen(cplx buf[], int n) 
+{
+	//Rearrange the array such that it can be iterated upon in the correct order
+	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
+	int i, j, len;
+	for (i = 1, j = 0; i < n; i++) 
+	{
+		int bit = n >> 1;
+		for (; j & bit; bit >>= 1)
+				j ^= bit;
+		j ^= bit;
+
+		//swap(buf[i], buf[j]);
+		cplx temp;
+    if (i < j)
+		{
+			temp = buf[i];
+			buf[i] = buf[j];
+			buf[j] = temp;
+		}
+  }
+
+	/*Compute the FFT for the array*/
+	cplx wlen, w, u, v;
+	// len goes 2, 4, ... n/2, n
+	// len iterates over the array log2(n) times
+  for (len = 2; len <= n; len <<= 1) 
+	{
+		double ang = 2 * M_PI / len;
 		wlen = cexp(I * ang);
 		
 		/* i goes from 0 to n with stride len
