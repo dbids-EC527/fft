@@ -304,13 +304,13 @@ void runIteration(int rowLen)
   for(i = 0; i < rowLen; i++) {
     for(j = 0; j < rowLen; j++)
     {
-        currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
-	currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
-        maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
-	maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
-        if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
-            errCount++;	    
-        }
+      currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
+	    currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
+      maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
+	    maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
+      if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
+          errCount++;	    
+      }
     }
   }
   if (errCount > 0) {
