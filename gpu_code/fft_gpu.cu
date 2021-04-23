@@ -54,7 +54,7 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 /*......CUDA Device Functions......*/
-__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi)
+__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi, int firstRow)
 {
   cuDoubleComplex wlen, w, u, v;
   int len, i, j;
@@ -80,7 +80,10 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
 				w = cuCmul(w, wlen);
 				//cuPrintf("len is %d i is %d j is %d\n", leni, i, j);
-				cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
+				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
+				if(firstRow)
+				cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
+	 cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3]), cuCimag(d_shared[3])); 
 			}
 			__syncthreads();
 		}
@@ -105,7 +108,8 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
   __syncthreads();
 
   //Do the FFT itself for the row
-  InnerFFT(rowLen, &d_shared[0], pi);
+  int firstRow = (rowIdx == 0);
+  InnerFFT(rowLen, &d_shared[0], pi, firstRow);
   __syncthreads();
 
   //Copy the data from shared memory to output
@@ -130,7 +134,7 @@ __global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComple
   __syncthreads();
 
   //Do the FFT itself for the column
-  InnerFFT(rowLen, &d_shared[0], pi);
+  InnerFFT(rowLen, &d_shared[0], pi, 0);
   __syncthreads();
 
   //Copy the data from shared memory to output
@@ -171,8 +175,8 @@ void runIteration(int rowLen)
   struct timespec time_start, time_stop;
 
   //Define local vars for checking correctness
-  int i, j, errCount = 0, zeroCount = 0;
-  double currDiff, maxDiff = 0;
+  int i, j, errCount = 0;
+  double currDiff_real, currDiff_imag, maxDiff = 0;
 
   //Check that row can fit into SM
   if(rowLen > MAX_SM_ELEM_NUM)
@@ -311,31 +315,18 @@ void runIteration(int rowLen)
   for(i = 0; i < rowLen; i++) {
     for(j = 0; j < rowLen; j++)
     {
-        currDiff = abs(creal(h_serial_array[i]) - creal(h_array[i]));
-        maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
-        if (currDiff > CHECK_TOL) {
-            errCount++;
-        }
-        if (h_array[i] == 0) {
-            zeroCount++;
-        }
-
-        currDiff = abs(cimag(h_serial_array[i]) - cimag(h_array[i]));
-        maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
-        if (currDiff > CHECK_TOL) {
-            errCount++;
-        }
-        if (h_array[i] == 0) {
-            zeroCount++;
+        currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
+	currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
+        maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
+	maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
+        if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
+            errCount++;	    
         }
     }
   }
   if (errCount > 0) {
     float percentError = ((float)errCount / (float)(n)) * 100.0;
     printf("\n@ERROR: TEST FAILED: %d results did not match (%0.6f%%)\n", errCount, percentError);
-  }
-  else if (zeroCount > 0){
-    printf("\n@ERROR: TEST FAILED: %d results (from GPU) are zero\n", zeroCount);
   }
   else {
     printf("\nTEST PASSED: All results matched\n");
@@ -449,9 +440,10 @@ void fft(cplx buf[], int n)
 				buf[i+j+(len/2)] = u - v;
 				w *= wlen;
 			//	printf("len is %d i is %d j is %d\n", len, i, j);
-				printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
+			//	printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
 			}
 		}
+		printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));
   }
 }
 
