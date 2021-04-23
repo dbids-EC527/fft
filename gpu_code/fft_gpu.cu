@@ -249,16 +249,16 @@ void runIteration(int rowLen)
   // Compute the fft for each thread
   //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
   int s = (int)log2((float)rowLen);
-  for(int i = 0; i < rowLen; i++)
-  {
+  //for(int i = 0; i < rowLen; i++)
+  //{
     FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
     cudaDeviceSynchronize();
-  }
-  for(int i = 0; i < rowLen; i++)
-  {
-    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
-    cudaDeviceSynchronize();
-  }
+  //}
+  //for(int i = 0; i < rowLen; i++)
+  //{
+    //FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
+    //cudaDeviceSynchronize();
+  //}
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
@@ -299,7 +299,12 @@ void runIteration(int rowLen)
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
-  fft_2d(h_serial_array, rowLen, n);
+  //fft_2d(h_serial_array, rowLen, n);
+
+  cplx* firstRow = malloc(sizeof(cplx) * rowLen);
+  firstRow = memcpy(firstRow, h_serial_array, sizeof(cplx) * rowLen);
+  fft(firstRow, n);
+
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
   printf("FFT_serial() took %f (msec)\n", time_spent*1000);
