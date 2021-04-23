@@ -55,7 +55,7 @@ void fft_2d(cplx buf[], int rowLen, int n);
 /*......CUDA Device Functions......*/
 __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
-  cuDoubleComplex wlen, w, u, v;
+  cuDoubleComplex w, u, v;
   int len, i, j;
   //if (threadIdx.x == 0 && threadIdx.y == 0)
   //{
@@ -69,7 +69,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 		{
 			//w = make_cuDoubleComplex(1, 0);
 			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
-      __syncthreads();
+      //__syncthreads();
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
 			//for (j = 0; j < (len / 2); j++) 
 			{
@@ -77,19 +77,18 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 				//Compute the DFT on the correct elements
 				u = d_shared[i+j];
 				v = cuCmul(d_shared[i+j+(len/2)], w);
-				cuPrintf("w is %f and v is %f\n", w, v);
+				//cuPrintf("w is %f and v is %f\n", w, v);
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
 				//w = cuCmul(w, wlen);
-				cuPrintf("len is %d i is %d j is %d\n", len, i, j);
+				//cuPrintf("len is %d i is %d j is %d\n", len, i, j);
 				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
-				cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
+				//cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
 	 cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3]), cuCimag(d_shared[3])); 
 			//__syncthreads();
 			}
 			__syncthreads();
 		}
-    __syncthreads();
   }
   //}
 }
@@ -249,19 +248,17 @@ void runIteration(int rowLen)
   cudaEventRecord(start_kernel, 0);
 
   // Compute the fft for each thread
-  //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
   int s = (int)log2((float)rowLen);
-  //for(int i = 0; i < rowLen; i++)
-  //{
-    i = 0;
+  for(int i = 0; i < rowLen; i++)
+  {
     FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
     cudaDeviceSynchronize();
-  //}
-  //for(int i = 0; i < rowLen; i++)
-  //{
-    //FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
-    //cudaDeviceSynchronize();
-  //}
+  }
+  for(int i = 0; i < rowLen; i++)
+  {
+    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
+    cudaDeviceSynchronize();
+  }
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
@@ -275,7 +272,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_out, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -302,15 +299,15 @@ void runIteration(int rowLen)
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
-  //fft_2d(h_serial_array, rowLen, n);
+  fft_2d(h_serial_array, rowLen, n);
 
-  cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
+  /*cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
   for(i = 0; i < rowLen; i++)
 	firstRow[i] = h_serial_array[i];
   fft(firstRow, rowLen);
   for(i = 0; i < rowLen; i++)
 	h_serial_array[i] = firstRow[i];
-  free(firstRow);
+  free(firstRow);*/
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
   printf("FFT_serial() took %f (msec)\n", time_spent*1000);
