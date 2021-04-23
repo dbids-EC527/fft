@@ -25,7 +25,6 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
   }
 }
  
-#define PI 3.1415926535897932384
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
@@ -35,9 +34,9 @@ typedef double complex cplx;
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
-#define MAX_SM_ELEM_NUM	      3072
+#define MAX_SM_ELEM_NUM	  3072
 #define BLOCK_DIM 	      32   //Max of 32
-#define GRID_DIM	      1   //Keep it to 1
+#define GRID_DIM	        1   //Keep it to 1
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -54,7 +53,7 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 /*......CUDA Device Functions......*/
-__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi, int firstRow)
+__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
   cuDoubleComplex wlen, w, u, v;
   int len, i, j;
@@ -62,7 +61,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
   //{
   for (len = 2; len <= rowLen; len <<= 1)
   {
-    double ang = 2 * pi / len;
+    double ang = 2 * M_PI / len;
     wlen = make_cuDoubleComplex(cos(ang), sin(ang));
     //i = (blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y))*len;
     //for (; i < rowLen; i += (blockDim.x*gridDim.x)*len)
@@ -70,6 +69,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 		{
 			w = make_cuDoubleComplex(1, 0);
 			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
+      __syncthreads();
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
 			//for (j = 0; j < (len / 2); j++) 
 			{
@@ -81,7 +81,6 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 				w = cuCmul(w, wlen);
 				cuPrintf("len is %d i is %d j is %d\n", len, i, j);
 				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
-				if(firstRow)
 				cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
 	 cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3]), cuCimag(d_shared[3])); 
 			//__syncthreads();
@@ -95,7 +94,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared, double pi
 
 // FFT kernel per SM code
 //Need to remove gridDim stuff if we do one block per row
-__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   int rowSz = rowIdx*rowLen;
   int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
@@ -109,8 +108,7 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
   __syncthreads();
 
   //Do the FFT itself for the row
-  int firstRow = (rowIdx == 0);
-  InnerFFT(rowLen, &d_shared[0], pi, firstRow);
+  InnerFFT(rowLen, &d_shared[0]);
   __syncthreads();
 
   //Copy the data from shared memory to output
@@ -122,7 +120,7 @@ __global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComple
 
 // FFT kernel per SM code
 //Need to remove gridDim stuff if we do one block per row
-__global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in, double pi)
+__global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   int rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x);
 
@@ -135,7 +133,7 @@ __global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComple
   __syncthreads();
 
   //Do the FFT itself for the column
-  InnerFFT(rowLen, &d_shared[0], pi, 0);
+  InnerFFT(rowLen, &d_shared[0]);
   __syncthreads();
 
   //Copy the data from shared memory to output
@@ -253,12 +251,12 @@ void runIteration(int rowLen)
   int s = (int)log2((float)rowLen);
   for(int i = 0; i < rowLen; i++)
   {
-    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array, PI);
+    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
     cudaDeviceSynchronize();
   }
   for(int i = 0; i < rowLen; i++)
   {
-    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out, PI);
+    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
     cudaDeviceSynchronize();
   }
 
@@ -413,7 +411,7 @@ void fft(cplx buf[], int n)
 	// len iterates over the array log2(n) times
   for (len = 2; len <= n; len <<= 1) 
 	{
-		double ang = 2 * PI / len;
+		double ang = 2 * M_PI / len;
 		wlen = cexp(I * ang);
 		
 		/* i goes from 0 to n with stride len
