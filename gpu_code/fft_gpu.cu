@@ -28,8 +28,8 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
-#define PRINT_GPU
-#define PRINT_MATRIX
+//#define PRINT_GPU
+//#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
@@ -57,19 +57,14 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
   cuDoubleComplex w, u, v;
   int len, i, j;
-  //if (threadIdx.x == 0 && threadIdx.y == 0)
-  //{
   for (len = 2; len <= rowLen; len <<= 1)
   {
     double ang = 2 * M_PI / len;
-    //wlen = make_cuDoubleComplex(cos(ang), sin(ang));
     //i = (blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y))*len;
     //for (; i < rowLen; i += (blockDim.x*gridDim.x)*len)
     for (i = 0; i < rowLen; i += len)
 		{
-			//w = make_cuDoubleComplex(1, 0);
 			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
-      //__syncthreads();
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
 			//for (j = 0; j < (len / 2); j++) 
 			{
@@ -77,20 +72,12 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 				//Compute the DFT on the correct elements
 				u = d_shared[i+j];
 				v = cuCmul(d_shared[i+j+(len/2)], w);
-				//cuPrintf("w is %f and v is %f\n", w, v);
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
-				//w = cuCmul(w, wlen);
-				//cuPrintf("len is %d i is %d j is %d\n", len, i, j);
-				//cuPrintf("i+j is %d, i+j+(len/2) is %d\n", i+j, i+j+(len/2));
-				//cuPrintf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]),\
-	 cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3]), cuCimag(d_shared[3])); 
-			//__syncthreads();
 			}
 			__syncthreads();
 		}
   }
-  //}
 }
 
 // FFT kernel per SM code
@@ -235,7 +222,7 @@ void runIteration(int rowLen)
 
   // Configure the kernel
   dim3 DimGrid(GRID_DIM, GRID_DIM, 1);    
-  dim3 DimBlock(2, 2, 1); 
+  dim3 DimBlock(BLOCK_DIM, BLOCK_DIM, 1); 
   printf("Kernal code launching\n");
 
 #ifdef PRINT_GPU
@@ -300,14 +287,6 @@ void runIteration(int rowLen)
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
   fft_2d(h_serial_array, rowLen, n);
-
-  /*cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
-  for(i = 0; i < rowLen; i++)
-	firstRow[i] = h_serial_array[i];
-  fft(firstRow, rowLen);
-  for(i = 0; i < rowLen; i++)
-	h_serial_array[i] = firstRow[i];
-  free(firstRow);*/
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
   printf("FFT_serial() took %f (msec)\n", time_spent*1000);
@@ -384,7 +363,7 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f, ",creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
+      printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
@@ -443,16 +422,11 @@ void fft(cplx buf[], int n)
 				//Compute the DFT on the correct elements
 				u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
-				printf("w is %f and v is %f\n", w, v);
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
-				w *= wlen;
-				printf("len is %d i is %d j is %d\n", len, i, j);
-			//	printf("i+j is %d i+j+(len/2) is %d\n", i+j, i+j+(len/2));
-				printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));   
+				w *= wlen;  
 			}
 		}
-		//printf("(%.3f, %.3f) (%.3f,%.3f) (%.3f,%.3f) (%.3f %.3f)\n", creal(buf[0]), cimag(buf[0]),creal(buf[1]), cimag(buf[1]), creal(buf[2]), cimag(buf[2]), creal(buf[3]), cimag(buf[3]));
   }
 }
 
