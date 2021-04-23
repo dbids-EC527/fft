@@ -1,6 +1,9 @@
 /*
     nvcc -arch sm_35 fft_gpu.cu -o fft_gpu
     nvcc -arch compute_70 -code sm_70 fft_gpu.cu -o fft_gpu
+
+    Helpful GPU code for reference:
+    https://github.com/marianhlavac/FFT-cuda/blob/master/src/fft-cuda.cu
 */
 
 #include <cstdio>
