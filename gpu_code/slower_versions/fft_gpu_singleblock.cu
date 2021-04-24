@@ -144,10 +144,11 @@ int main(int argc, char **argv)
   }
   else 
   {
-    printf("Running code for 1024x1024 matrix\n");
-    runIteration(1024);
-    printf("Running code for 2048x2048 matrix\n");
-    runIteration(2048);
+    for(int i = 2; i < 3072; i <<= 1)
+    {
+      printf("Running code for %dx%d matrix\n", i, i);
+      runIteration(i);
+    }
   }     
   
   return 0;
