@@ -63,11 +63,11 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
   for (len = 2; len <= rowLen; len <<= 1)
   {
     double ang = 2 * M_PI / len;
-    //for ((threadIdx.x + (blockDim.x*threadIdx.y))*len; i < rowLen; i += (blockDim.x*gridDim.x)*len)
-    for (i = 0; i < rowLen; i += len)
+    for ((threadIdx.x + (blockDim.x*threadIdx.y))*len; i < rowLen; i += (blockDim.x*gridDim.x)*len)
+    //for (i = 0; i < rowLen; i += len)
 		{
-			for (threadIdx.x + (blockDim.x*threadIdx.y); j < (len / 2); j += blockDim.x*blockDim.y)
-			//for (j = 0; j < (len / 2); j++) 
+			//for (j = threadIdx.x + (blockDim.x*threadIdx.y); j < (len / 2); j += blockDim.x*blockDim.y)
+			for (j = 0; j < (len / 2); j++) 
 			{
 				w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				//Compute the DFT on the correct elements

@@ -1,6 +1,0 @@
-Doing FFT for 4 different matrix sizes from 32 to 160
-GPU kernel time, GPU overall time
-1.634336, 1.695648
-5.284896, 5.356544
-11.087648, 11.195680
-19.274912, 19.437088
