@@ -1,0 +1,176 @@
+Running code for 2x2 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.062496 (msec)
+GPU overall time: 0.142144 (msec)
+FFT_serial() start
+FFT_serial() took 0.016986 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 2x2 matrix
+
+Running code for 4x4 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.034784 (msec)
+GPU overall time: 0.072704 (msec)
+FFT_serial() start
+FFT_serial() took 0.026877 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 4x4 matrix
+
+Running code for 8x8 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.037920 (msec)
+GPU overall time: 0.081984 (msec)
+FFT_serial() start
+FFT_serial() took 0.033572 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 8x8 matrix
+
+Running code for 16x16 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.037920 (msec)
+GPU overall time: 0.077376 (msec)
+FFT_serial() start
+FFT_serial() took 0.128931 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 16x16 matrix
+
+Running code for 32x32 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.051168 (msec)
+GPU overall time: 0.097984 (msec)
+FFT_serial() start
+FFT_serial() took 0.540954 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 32x32 matrix
+
+Running code for 64x64 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.071648 (msec)
+GPU overall time: 0.151712 (msec)
+FFT_serial() start
+FFT_serial() took 2.369266 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 64x64 matrix
+
+Running code for 128x128 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.126656 (msec)
+GPU overall time: 0.304960 (msec)
+FFT_serial() start
+FFT_serial() took 10.489951 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 128x128 matrix
+
+Running code for 256x256 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 0.441888 (msec)
+GPU overall time: 1.034560 (msec)
+FFT_serial() start
+FFT_serial() took 45.987939 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 256x256 matrix
+
+Running code for 512x512 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 1.684704 (msec)
+GPU overall time: 3.656000 (msec)
+FFT_serial() start
+FFT_serial() took 199.772406 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 512x512 matrix
+
+Running code for 1024x1024 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 5.885568 (msec)
+GPU overall time: 11.434240 (msec)
+FFT_serial() start
+FFT_serial() took 880.145571 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 1024x1024 matrix
+
+Running code for 2048x2048 matrix
+
+Initializing the arrays ...	... done
+
+Kernal code launching
+
+GPU kernel time: 22.013599 (msec)
+GPU overall time: 43.317505 (msec)
+FFT_serial() start
+FFT_serial() took 3792.032701 (msec)
+
+TEST PASSED: All results matched
+MAX_DIFFERENCE = 0.000000 between serial and GPU code
+
+Done with 2048x2048 matrix
+
