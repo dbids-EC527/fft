@@ -38,8 +38,8 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	      32   //Max of 32
-#define GRID_DIM	        1   //Keep it to 1
+#define BLOCK_DIM 	  2  //Max of 32
+#define GRID_DIM	  3072 //Max of 2147483647
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -67,9 +67,9 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
     //for (; i < rowLen; i += (blockDim.x*gridDim.x)*len)
     for (i = 0; i < rowLen; i += len)
 		{
-			j = blockIdx.x * blockDim.x + threadIdx.x + (blockDim.x*threadIdx.y);
+			j = threadIdx.x + (blockDim.x*threadIdx.y);
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
-			//for (j = 0; j < (len / 2); j++) 
+			for (j = 0; j < (len / 2); j++) 
 			{
 				w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				//Compute the DFT on the correct elements
@@ -86,10 +86,11 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 // FFT kernel per SM code
 __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  for(int rowIdx = blockIdx.y; rowIdx < rowLen; rowIdx += gridDim.y)
+  for(int rowIdx = blockIdx.x; rowIdx < rowLen; rowIdx += gridDim.x)
   {
+    //cuPrintf("rowIdx is %d blockIdx.x is %d gridDim.x is %d\n", rowIdx, blockIdx.x, gridDim.x);
     int rowSz = rowIdx*rowLen;
-    int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+    int colIdx  = threadIdx.x + (blockDim.x*threadIdx.y);
 
     //Load the given index into shared memory and do the bit order reversal in the time domain
     __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
@@ -102,21 +103,24 @@ __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cu
     //Do the FFT itself for the row
     InnerFFT(rowLen, &d_shared[0]);
     __syncthreads();
+    //if(rowIdx == 0)
+	//cuPrintf("(%f,%f)(%f,%f)(%f,%f)(%f,%f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]), cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3    ]), cuCimag(d_shared[3]));
 
     //Copy the data from shared memory to output
-    for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
+    for(colIdx  = threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
     {  
       d_out[colIdx + rowSz] = d_shared[colIdx];
     } 
   }
+  __syncthreads();
 }
 
 // FFT kernel per SM code
-__global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  for(int colIdx = blockIdx.y; colIdx < rowLen; colIdx += gridDim.y)
+  for(int colIdx = blockIdx.x; colIdx < rowLen; colIdx += gridDim.x)
   {
-    int rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x);
+    int rowIdx  = threadIdx.y + (blockDim.y*threadIdx.x);
 
     //Load the given index into shared memory and do the bit order reversal in the time domain
     __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
@@ -131,7 +135,7 @@ __global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComple
     __syncthreads();
 
     //Copy the data from shared memory to output
-    for(rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*blockDim.x)
+    for(rowIdx  = threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*blockDim.x)
     {  
       d_out[rowIdx*rowLen + colIdx] = d_shared[rowIdx];
     } 
@@ -228,8 +232,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
 
   // Configure the kernel
-  dim3 DimGridRow(1, GRID_DIM, 1);
-  dim3 DimGridCol(GRID_DIM, 1, 1);      
+  dim3 DimGrid(GRID_DIM, 1, 1);      
   dim3 DimBlock(BLOCK_DIM, BLOCK_DIM, 1); 
   printf("Kernal code launching\n");
 
@@ -245,10 +248,10 @@ void runIteration(int rowLen)
   // Compute the fft for each thread
   int s = (int)log2((float)rowLen);
 
-  FFT_Kernel_Row<<<DimGridRow, DimBlock>>>(rowLen, s, d_array_out, d_array);
+  FFT_Kernel_Row<<<DimGrid, DimBlock>>>(rowLen, s, d_array_out, d_array);
   cudaDeviceSynchronize();
 
-  FFT_Kernel_Col<<<DimGridCol, DimBlock>>>(rowLen, s, d_array, d_array_out);
+  FFT_Kernel_Col<<<DimGrid, DimBlock>>>(rowLen, s, d_array, d_array_out);
   cudaDeviceSynchronize();
 
   // End kernel timing
@@ -286,7 +289,16 @@ void runIteration(int rowLen)
     h_array[i] = real_part + I*imag_part;
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
-
+  
+  /*cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
+  for(int i = 0; i < rowLen; i++)
+	firstRow[i] = h_serial_array[i];
+  fft(firstRow, rowLen);
+  for (int j = 0; j < rowLen; j++)
+  {
+    printf("%.1f+j%.1f, ", creal(firstRow[j]), cimag(firstRow[j]));
+  }*/ 
+  
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
