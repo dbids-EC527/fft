@@ -48,7 +48,7 @@ typedef double complex cplx;
 //Used to iterate through different array sizes
 #define DELTA 32
 #define BASE  32
-#define ITERS 550  
+#define ITERS 4  
 
 //Function prototypes
 void initializeArray(cplx *arr, int len, int seed);
@@ -162,11 +162,11 @@ void runIteration(int rowLen)
   float elapsed_gpu, elapsed_gpu_kernel;
   
   //Serial Timing variables:
-  struct timespec time_start, time_stop;
+  //struct timespec time_start, time_stop;
 
   //Define local vars for checking correctness
-  int i, j, errCount = 0;
-  double currDiff_real, currDiff_imag, maxDiff = 0;
+  int i;
+  //double currDiff_real, currDiff_imag, maxDiff = 0;
 
   //Check that row can fit into SM
   if(rowLen > MAX_SM_ELEM_NUM)
@@ -325,7 +325,7 @@ void runIteration(int rowLen)
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
   CUDA_SAFE_CALL(cudaFree(d_array_out));
-  free(h_serial_array);
+  //free(h_serial_array);
   free(h_array);
 
   CUDA_SAFE_CALL(cudaDeviceReset());
