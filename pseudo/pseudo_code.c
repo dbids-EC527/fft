@@ -29,4 +29,3 @@ void fft(cplx buf[], int n)
 		}
   }
 }
-
