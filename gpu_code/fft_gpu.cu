@@ -38,8 +38,8 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	  8  //Max of 32
-#define GRID_DIM	  3072 //Max of 2147483647
+#define BLOCK_DIM 	      8  //Max of 32
+#define GRID_DIM	        3072 //Max of 2147483647
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -290,15 +290,6 @@ void runIteration(int rowLen)
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
   
-  /*cplx* firstRow = (cplx*) calloc(rowLen, sizeof(cplx));
-  for(int i = 0; i < rowLen; i++)
-	firstRow[i] = h_serial_array[i];
-  fft(firstRow, rowLen);
-  for (int j = 0; j < rowLen; j++)
-  {
-    printf("%.1f+j%.1f, ", creal(firstRow[j]), cimag(firstRow[j]));
-  }*/ 
-  
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
@@ -444,67 +435,6 @@ void fft(cplx buf[], int n)
   }
 }
 
-/* Performs in place FFT on buf of size n*/
-void fft_wlen(cplx buf[], int n) 
-{
-	//Rearrange the array such that it can be iterated upon in the correct order
-	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
-	int i, j, len;
-	for (i = 1, j = 0; i < n; i++) 
-	{
-		int bit = n >> 1;
-		for (; j & bit; bit >>= 1)
-				j ^= bit;
-		j ^= bit;
-
-		//swap(buf[i], buf[j]);
-		cplx temp;
-    if (i < j)
-		{
-			temp = buf[i];
-			buf[i] = buf[j];
-			buf[j] = temp;
-		}
-  }
-
-	/*Compute the FFT for the array*/
-	cplx wlen, w, u, v;
-	// len goes 2, 4, ... n/2, n
-	// len iterates over the array log2(n) times
-  for (len = 2; len <= n; len <<= 1) 
-	{
-		double ang = 2 * M_PI / len;
-		wlen = cexp(I * ang);
-		
-		/* i goes from 0 to n with stride len
-		j goes from 0 to len/2 in stride 1
-
-		The sum of i+j is used to index into the buffer 
-		and determine the correct indexes at which to perform the DFT.
-		For example if n = 8:
-		For the first iteration len = 2, i = 0,2,4,8, j = 0 so that i + j = 0,2,4,8.  
-		For the second iteration len = 4, i = 0,4, j = 0,1  so that i + j = 0,1,4,5.  
-		For the final iteration len = 8, i = 0, j = 0,1,2,3 so that i + j = 0,1,2,3.
-		This allows us to DFT properly for each index based on the conceptual algorithm.
-
-		For each iteration of there are n/2 iterations as shown above,
-		*/
-		for (i = 0; i < n; i += len) 
-		{
-			w = 1;
-			for (j = 0; j < (len / 2); j++) 
-			{
-				//Compute the DFT on the correct elements
-				u = buf[i+j];
-				v = buf[i+j+(len/2)] * w;
-				buf[i+j] = u + v;
-				buf[i+j+(len/2)] = u - v;
-				w *= wlen;  
-			}
-		}
-  }
-}
-
 /* Transpose the matrix */
 void transpose(cplx buf[], int rowLen)
 {
@@ -542,20 +472,4 @@ void fft_2d(cplx buf[], int rowLen, int n)
 
 	// Transpose back
 	transpose(buf, rowLen);
-}
-
-//Print the complex arrays before and after FFT
-void show_buffer(cplx buf[], int rowLen, int n) {
-	int i;
-	for (i = 0; i < n; i++)
-	{
-		if (i%rowLen == 0)
-			printf("\n");
-
-		if (!cimag(buf[i]))
-			printf("%g ", creal(buf[i]));
-		else
-			printf("(%g,%g) ", creal(buf[i]), cimag(buf[i]));
-	}
-	printf("\n\n");
 }
