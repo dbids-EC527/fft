@@ -63,7 +63,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
   for (len = 2; len <= rowLen; len <<= 1)
   {
     double ang = 2 * M_PI / len;
-    for ((threadIdx.x + (blockDim.x*threadIdx.y))*len; i < rowLen; i += (blockDim.x*gridDim.x)*len)
+    for (i = (threadIdx.x + (blockDim.x*threadIdx.y))*len; i < rowLen; i += (blockDim.x*blockDim.y)*len)
     //for (i = 0; i < rowLen; i += len)
 		{
 			//for (j = threadIdx.x + (blockDim.x*threadIdx.y); j < (len / 2); j += blockDim.x*blockDim.y)
@@ -76,8 +76,9 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 				d_shared[i+j] = cuCadd(u, v);
 				d_shared[i+j+(len/2)] = cuCsub(u, v);
 			}
-			__syncthreads();
+			//__syncthreads();
 		}
+	__syncthreads();
   }
 }
 
