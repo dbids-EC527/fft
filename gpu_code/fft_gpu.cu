@@ -38,7 +38,7 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	  2  //Max of 32
+#define BLOCK_DIM 	  8  //Max of 32
 #define GRID_DIM	  3072 //Max of 2147483647
 
 #define CHECK_TOL          0.05
@@ -69,7 +69,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 		{
 			j = threadIdx.x + (blockDim.x*threadIdx.y);
 			for (; j < (len / 2); j += blockDim.x*blockDim.y)
-			for (j = 0; j < (len / 2); j++) 
+			//for (j = 0; j < (len / 2); j++) 
 			{
 				w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				//Compute the DFT on the correct elements
