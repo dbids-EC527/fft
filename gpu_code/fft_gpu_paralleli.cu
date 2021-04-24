@@ -56,6 +56,7 @@ void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
 
 /*......CUDA Device Functions......*/
+//Computes the FFT for a Block that has already been loaded in bit reversed order
 __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
   cuDoubleComplex w, u, v;
@@ -69,8 +70,8 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 			//for (j = threadIdx.x + (blockDim.x*threadIdx.y); j < (len / 2); j += blockDim.x*blockDim.y)
 			for (j = 0; j < (len / 2); j++) 
 			{
-				w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				//Compute the DFT on the correct elements
+        w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
 				u = d_shared[i+j];
 				v = cuCmul(d_shared[i+j+(len/2)], w);
 				d_shared[i+j] = cuCadd(u, v);
@@ -82,12 +83,11 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
   }
 }
 
-// FFT kernel per SM code
+// FFT kernel per SM code for rows
 __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   for(int rowIdx = blockIdx.x; rowIdx < rowLen; rowIdx += gridDim.x)
   {
-    //cuPrintf("rowIdx is %d blockIdx.x is %d gridDim.x is %d\n", rowIdx, blockIdx.x, gridDim.x);
     int rowSz = rowIdx*rowLen;
     int colIdx  = threadIdx.x + (blockDim.x*threadIdx.y);
 
@@ -112,7 +112,7 @@ __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cu
   __syncthreads();
 }
 
-// FFT kernel per SM code
+// FFT kernel per SM code for columns
 __global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
   for(int colIdx = blockIdx.x; colIdx < rowLen; colIdx += gridDim.x)
