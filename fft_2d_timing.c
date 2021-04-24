@@ -33,8 +33,8 @@ typedef double complex cplx;
 
 //Used to iterate through different array sizes
 #define DELTA 32
-#define BASE 11136
-#define ITERS 200     
+#define BASE  32
+#define ITERS 550    
 
 //Prototypes
 double interval(struct timespec start, struct timespec end);
