@@ -38,8 +38,8 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	      8  //Max of 32
-#define GRID_DIM	        3072 //Max of 2147483647
+#define BLOCK_DIM 	  16	 //Max of 32
+#define GRID_DIM	  3072 	 //Max of 2147483647
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -144,18 +144,20 @@ __global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cu
 int main(int argc, char **argv)
 {
   //Get the row length
-  if (argc > 1) {
+  if (argc > 1) 
+  {
     int rowLen = atoi(argv[1]);
     printf("Running code for %dx%d matrix\n", rowLen, rowLen);
     runIteration(rowLen);
   }
   else 
   {
-    printf("Running code for 1024x1024 matrix\n");
-    runIteration(1024);
-    printf("Running code for 2048x2048 matrix\n");
-    runIteration(2048);
-  }     
+    for(int i = 2; i < 3072; i <<= 1)
+    {
+      printf("Running code for %dx%d matrix\n", i, i);
+      runIteration(i);
+    }
+}     
   
   return 0;
 }
