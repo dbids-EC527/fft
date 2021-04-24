@@ -1,6 +1,6 @@
 /*
-    nvcc -arch sm_35 fft_gpu.cu -o fft_gpu
-    nvcc -arch compute_70 -code sm_70 fft_gpu.cu -o fft_gpu
+    nvcc -arch sm_35 fft_gpu_singleblock.cu -o fft_gpu_singleblock
+    nvcc -arch compute_70 -code sm_70 fft_gpu_singleblock.cu -o fft_gpu_singleblock
 
     Helpful GPU code for reference:
     https://github.com/marianhlavac/FFT-cuda/blob/master/src/fft-cuda.cu
@@ -38,8 +38,8 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	      8  //Max of 32
-#define GRID_DIM	        3072 //Max of 2147483647
+#define BLOCK_DIM 	      16  //Max of 32
+#define GRID_DIM	        1 //Max of 2147483647
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
@@ -84,10 +84,8 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 }
 
 // FFT kernel per SM code
-__global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  for(int rowIdx = blockIdx.x; rowIdx < rowLen; rowIdx += gridDim.x)
-  {
     //cuPrintf("rowIdx is %d blockIdx.x is %d gridDim.x is %d\n", rowIdx, blockIdx.x, gridDim.x);
     int rowSz = rowIdx*rowLen;
     int colIdx  = threadIdx.x + (blockDim.x*threadIdx.y);
@@ -103,23 +101,17 @@ __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cu
     //Do the FFT itself for the row
     InnerFFT(rowLen, &d_shared[0]);
     __syncthreads();
-    //if(rowIdx == 0)
-	//cuPrintf("(%f,%f)(%f,%f)(%f,%f)(%f,%f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]), cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3    ]), cuCimag(d_shared[3]));
 
     //Copy the data from shared memory to output
     for(colIdx  = threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
     {  
       d_out[colIdx + rowSz] = d_shared[colIdx];
     } 
-  }
-  __syncthreads();
 }
 
 // FFT kernel per SM code
-__global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+__global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
 {
-  for(int colIdx = blockIdx.x; colIdx < rowLen; colIdx += gridDim.x)
-  {
     int rowIdx  = threadIdx.y + (blockDim.y*threadIdx.x);
 
     //Load the given index into shared memory and do the bit order reversal in the time domain
@@ -139,7 +131,6 @@ __global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cu
     {  
       d_out[rowIdx*rowLen + colIdx] = d_shared[rowIdx];
     } 
-  }
 }
 
 /*......Host Code......*/
@@ -247,12 +238,16 @@ void runIteration(int rowLen)
 
   // Compute the fft for each thread
   int s = (int)log2((float)rowLen);
-
-  FFT_Kernel_Row<<<DimGrid, DimBlock>>>(rowLen, s, d_array_out, d_array);
-  cudaDeviceSynchronize();
-
-  FFT_Kernel_Col<<<DimGrid, DimBlock>>>(rowLen, s, d_array, d_array_out);
-  cudaDeviceSynchronize();
+  for(int i = 0; i < rowLen; i++)
+  {
+    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
+    cudaDeviceSynchronize();
+  }
+  for(int i = 0; i < rowLen; i++)
+  {
+    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
+    cudaDeviceSynchronize();
+  }
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);

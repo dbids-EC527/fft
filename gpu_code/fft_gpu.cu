@@ -103,9 +103,7 @@ __global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cu
     //Do the FFT itself for the row
     InnerFFT(rowLen, &d_shared[0]);
     __syncthreads();
-    //if(rowIdx == 0)
-	//cuPrintf("(%f,%f)(%f,%f)(%f,%f)(%f,%f)\n", cuCreal(d_shared[0]), cuCimag(d_shared[0]), cuCreal(d_shared[1]), cuCimag(d_shared[1]), cuCreal(d_shared[2]), cuCimag(d_shared[2]), cuCreal(d_shared[3    ]), cuCimag(d_shared[3]));
-
+    
     //Copy the data from shared memory to output
     for(colIdx  = threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
     {  

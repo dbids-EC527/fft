@@ -330,7 +330,6 @@ void runIteration(int rowLen)
 
   printf("Done with %dx%d matrix\n\n", rowLen, rowLen);
 }
-
 //Initiaizes the array to consistent random values
 void initializeArray(cplx *arr, int len, int seed) {
   int i;
@@ -364,7 +363,7 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f, ",creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
+      printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
@@ -394,14 +393,13 @@ void fft(cplx buf[], int n)
   }
 
 	/*Compute the FFT for the array*/
-	cplx wlen, w, u, v;
+	cplx w, u, v;
 	// len goes 2, 4, ... n/2, n
 	// len iterates over the array log2(n) times
   for (len = 2; len <= n; len <<= 1) 
 	{
 		double ang = 2 * M_PI / len;
-		wlen = cexp(I * ang);
-		
+
 		/* i goes from 0 to n with stride len
 		j goes from 0 to len/2 in stride 1
 
@@ -417,15 +415,14 @@ void fft(cplx buf[], int n)
 		*/
 		for (i = 0; i < n; i += len) 
 		{
-			w = 1;
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-				u = buf[i+j];
+				w = cexp(I * ang * j);
+        u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
-				w *= wlen;
 			}
 		}
   }
@@ -468,20 +465,4 @@ void fft_2d(cplx buf[], int rowLen, int n)
 
 	// Transpose back
 	transpose(buf, rowLen);
-}
-
-//Print the complex arrays before and after FFT
-void show_buffer(cplx buf[], int rowLen, int n) {
-	int i;
-	for (i = 0; i < n; i++)
-	{
-		if (i%rowLen == 0)
-			printf("\n");
-
-		if (!cimag(buf[i]))
-			printf("%g ", creal(buf[i]));
-		else
-			printf("(%g,%g) ", creal(buf[i]), cimag(buf[i]));
-	}
-	printf("\n\n");
 }
