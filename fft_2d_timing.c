@@ -62,8 +62,8 @@ int main(int argc, char *argv[])
   long int iters = 0;
   for(long int i = BASE; iters < ITERS; i+=DELTA, iters++)
   {
-    printf("iter %ld, size %ld\r", iters, i);
-    fflush(stdout);
+    //printf("iter %ld, size %ld\r", iters, i);
+    //fflush(stdout);
 
     //Start Timer
     clock_gettime(CLOCK_REALTIME, &time_start);

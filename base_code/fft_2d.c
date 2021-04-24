@@ -12,7 +12,8 @@
 		https://towardsdatascience.com/fast-fourier-transform-937926e591cb
 
 */
-
+#define _USE_MATH_DEFINES
+#define _POSIX_C_SOURCE 200809L 
 #include <stdio.h>
 #include <math.h>
 #include <complex.h>
@@ -49,7 +50,7 @@ void fft(cplx buf[], int n)
 	// len iterates over the array log2(n) times
   for (len = 2; len <= n; len <<= 1) 
 	{
-		double ang = 2 * M_PI / len;
+		double ang = 2 * PI / len;
 
 		/* i goes from 0 to n with stride len
 		j goes from 0 to len/2 in stride 1
