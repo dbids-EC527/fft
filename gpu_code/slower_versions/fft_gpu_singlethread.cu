@@ -9,8 +9,8 @@
 #include <complex.h>
 #include <time.h>
 #include <string.h>
-#include "../ultilities/cuPrintf.cu"
-#include "../ultilities/cuPrintf.cuh"
+#include "../utilities/cuPrintf.cu"
+#include "../utilities/cuPrintf.cuh"
 #include <cuComplex.h>
 
 // Assertion to check for errors
