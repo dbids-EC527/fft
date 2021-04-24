@@ -1,7 +1,7 @@
 /*	Devin Bidstrup 03/29/21-05/07/21
  
 	Must compile with:
-	gcc fft_2d_timing.c ./base_code/fft_2d.c -o fft_2d_timing -lm -std=c11
+	gcc fft_2d_timing.c ../base_code/fft_2d.c -o fft_2d_timing -lm -std=c11
 
   	
 	Code based on a number of sources:
@@ -22,7 +22,7 @@
 #include <string.h>
 
 //My own fft2d code
-#include "base_code/fft_2d.h"
+#include "../base_code/fft_2d.h"
  
 #define PI 3.1415926535897932384
 typedef double complex cplx;

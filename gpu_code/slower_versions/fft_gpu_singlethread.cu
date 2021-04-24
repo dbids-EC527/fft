@@ -1,6 +1,6 @@
 /*
-    nvcc -arch sm_35 bitreverse.cu -o bitreverse
-    nvcc -arch compute_70 -code sm_70 bitreverse.cu -o bitreverse  
+    nvcc -arch sm_35 fft_gpu_singlethread.cu -o fft_gpu_singlethread
+    nvcc -arch compute_70 -code sm_70 fft_gpu_singlethread.cu -o fft_gpu_singlethread
 */
 
 #include <cstdio>
@@ -9,8 +9,8 @@
 #include <complex.h>
 #include <time.h>
 #include <string.h>
-#include "cuPrintf.cu"
-#include "cuPrintf.cuh"
+#include "../ultilities/cuPrintf.cu"
+#include "../ultilities/cuPrintf.cuh"
 #include <cuComplex.h>
 
 // Assertion to check for errors
@@ -25,7 +25,6 @@ inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
   }
 }
  
-#define PI 3.1415926535897932384
 typedef double complex cplx;
 
 //Definitions which turn on and off test printing
@@ -36,7 +35,7 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	      3072
-#define BLOCK_DIM 	      32   //Max of 32
+#define BLOCK_DIM 	      1   //Max of 32
 #define GRID_DIM	      1   //Keep it to 1
 
 #define CHECK_TOL          0.05
@@ -50,34 +49,86 @@ void printArray(int rowLen, cplx* data);
 void runIteration(int rowLen);
 void show_buffer(cplx buf[], int rowLen, int n);
 void transpose(cplx buf[], int rowLen);
-void reverse(cplx buf[], int n);
-void reverse_2d(cplx buf[], int rowLen, int n);
+void fft(cplx buf[], int n);
+void fft_2d(cplx buf[], int rowLen, int n);
 
-//Does bitwise reversal of a row of the overall matrix in the GPU
-//Uses coalesced memory accesses in global memory with possible thread divergence if matrix dimensions are poorly chosen
-__global__ void reverseArrayBlockRow(int i, int rowLen, int s,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+/*......CUDA Device Functions......*/
+__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
-  int rowIdx = i*rowLen;
-  int j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
+  cuDoubleComplex wlen, w, u, v;
+  int len, i, j;
+  if (threadIdx.x == 0 && threadIdx.y == 0)
+  {
+    for (len = 2; len <= rowLen; len <<= 1)
+    {
+      double ang = 2 * M_PI / len;
+      wlen = make_cuDoubleComplex(cos(ang), sin(ang));
+      for (i = 0; i < rowLen; i += len)
+      {
+        w = make_cuDoubleComplex(1, 0);
+        for (j = 0; j < (len / 2); j++) 
+        {
+          //Compute the DFT on the correct elements
+          u = d_shared[i+j];
+          v = cuCmul(d_shared[i+j+(len/2)], w);
+          d_shared[i+j] = cuCadd(u, v);
+          d_shared[i+j+(len/2)] = cuCsub(u, v);
+          w = cuCmul(w, wlen);
+        }
+      }
+    }
+  }
+}
+
+// FFT kernel per SM code
+//Need to remove gridDim stuff if we do one block per row
+__global__ void FFT_Kernel_Row(int rowIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+{
+  int rowSz = rowIdx*rowLen;
+  int colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y);
 
   //Load the given index into shared memory and do the bit order reversal in the time domain
   __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-  for(; j < rowLen; j += blockDim.x*gridDim.x)
+  for(; colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
   {  
-    if(j < rowLen)
-      d_shared[(__brev(j) >> (32 - s))] = d_in[j + rowIdx];
-      //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
+    d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
   }
   __syncthreads();
 
-  //Copy the data back out
-  for(j  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); j < rowLen; j += blockDim.x*gridDim.x)
+  //Do the FFT itself for the row
+  InnerFFT(rowLen, &d_shared[0]);
+  __syncthreads();
+
+  //Copy the data from shared memory to output
+  for(colIdx  = (blockDim.x * blockIdx.x) + threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
   {  
-    if(j < rowLen)
-      d_out[j + rowIdx] = d_shared[j];
-    //cuPrintf("j was :%d and oidx was %d\n", j, (__brev(j) >> (32 - s)));
-    //cuPrintf("d_shared[%d] = (%f, %f)\n", j, cuCreal(d_shared[j]), cuCreal(d_shared[j]));
+    d_out[colIdx + rowSz] = d_shared[colIdx];
+  } 
+}
+
+// FFT kernel per SM code
+//Need to remove gridDim stuff if we do one block per row
+__global__ void FFT_Kernel_Col(int colIdx, int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
+{
+  int rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x);
+
+  //Load the given index into shared memory and do the bit order reversal in the time domain
+  __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
+  for(; rowIdx < rowLen; rowIdx += blockDim.y*blockDim.y)
+  {  
+    d_shared[(__brev(rowIdx) >> (32 - logn))] = d_in[rowIdx*rowLen + colIdx];
   }
+  __syncthreads();
+
+  //Do the FFT itself for the column
+  InnerFFT(rowLen, &d_shared[0]);
+  __syncthreads();
+
+  //Copy the data from shared memory to output
+  for(rowIdx  = (blockDim.y * blockIdx.y) + threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*blockDim.x)
+  {  
+    d_out[rowIdx*rowLen + colIdx] = d_shared[rowIdx];
+  } 
 }
 
 /*......Host Code......*/
@@ -88,7 +139,6 @@ int main(int argc, char **argv)
     int rowLen = atoi(argv[1]);
     printf("Running code for %dx%d matrix\n", rowLen, rowLen);
     runIteration(rowLen);
-    printf("cuComplexDouble is %d bytes\n", sizeof(cuDoubleComplex));
   }
   else 
   {
@@ -112,8 +162,8 @@ void runIteration(int rowLen)
   struct timespec time_start, time_stop;
 
   //Define local vars for checking correctness
-  int i, j, errCount = 0, zeroCount = 0;
-  double currDiff, maxDiff = 0;
+  int i, j, errCount = 0;
+  double currDiff_real, currDiff_imag, maxDiff = 0;
 
   //Check that row can fit into SM
   if(rowLen > MAX_SM_ELEM_NUM)
@@ -158,7 +208,9 @@ void runIteration(int rowLen)
 
   // Allocate arrays on GPU global memory
   cuDoubleComplex* d_array;
+  cuDoubleComplex* d_array_out;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cuDoubleComplex)));
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
   
   // Start overall GPU timing
   cudaEventCreate(&start);
@@ -169,8 +221,8 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
 
   // Configure the kernel
-  dim3 DimGrid(GRID_DIM, GRID_DIM, 1);    
-  dim3 DimBlock(BLOCK_DIM, BLOCK_DIM, 1); 
+  dim3 DimGrid(1, 1, 1);    
+  dim3 DimBlock(1, 1, 1); 
   printf("Kernal code launching\n");
 
 #ifdef PRINT_GPU
@@ -182,13 +234,17 @@ void runIteration(int rowLen)
   cudaEventCreate(&stop_kernel);
   cudaEventRecord(start_kernel, 0);
 
-  // Compute the rev for each thread
-  cuDoubleComplex* d_array_rev;
-  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_rev, n*sizeof(cuDoubleComplex)));
+  // Compute the fft for each thread
+  //FFT_Kernel<<<DimGrid, DimBlock>>>(rowLen, d_array);
   int s = (int)log2((float)rowLen);
   for(int i = 0; i < rowLen; i++)
   {
-    reverseArrayBlockRow<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_rev, d_array);
+    FFT_Kernel_Row<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array_out, d_array);
+    cudaDeviceSynchronize();
+  }
+  for(int i = 0; i < rowLen; i++)
+  {
+    FFT_Kernel_Col<<<DimGrid, DimBlock>>>(i, rowLen, s, d_array, d_array_out);
     cudaDeviceSynchronize();
   }
 
@@ -204,7 +260,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaPeekAtLastError());
 
   // Transfer the results back to the host
-  CUDA_SAFE_CALL(cudaMemcpy(d, d_array_rev, allocSize, cudaMemcpyDeviceToHost));
+  CUDA_SAFE_CALL(cudaMemcpy(d, d_array, allocSize, cudaMemcpyDeviceToHost));
   
 #ifdef PRINT_GPU
   cudaPrintfDisplay(stdout, true);
@@ -231,10 +287,10 @@ void runIteration(int rowLen)
   // Compute the results on the host
   printf("FFT_serial() start\n");
   clock_gettime(CLOCK_REALTIME, &time_start);
-  reverse_2d(h_serial_array, rowLen, n);
+  fft_2d(h_serial_array, rowLen, n);
   clock_gettime(CLOCK_REALTIME, &time_stop);
   double time_spent = interval(time_start, time_stop);
-  printf("FFT_serial() took %f seconds\n", time_spent);
+  printf("FFT_serial() took %f (msec)\n", time_spent*1000);
 
   // Compare the results
 #ifdef PRINT_MATRIX
@@ -246,32 +302,18 @@ void runIteration(int rowLen)
   for(i = 0; i < rowLen; i++) {
     for(j = 0; j < rowLen; j++)
     {
-        currDiff = abs(creal(h_serial_array[i]) - creal(h_array[i]));
-	      maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
-        if (currDiff > CHECK_TOL) {
-            errCount++;
-        }
-        if (h_array[i] == 0) {
-            zeroCount++;
-        }
-
-        currDiff = abs(cimag(h_serial_array[i]) - cimag(h_array[i]));
-	      maxDiff = (maxDiff < currDiff) ? currDiff : maxDiff;
-        if (currDiff > CHECK_TOL) {
-            errCount++;
-        }
-        if (h_array[i] == 0) {
-            zeroCount++;
-        }
+      currDiff_real = abs(creal(h_serial_array[i*rowLen+j]) - creal(h_array[i*rowLen+j]));
+	    currDiff_imag = abs(cimag(h_serial_array[i*rowLen+j]) - cimag(h_array[i*rowLen+j]));
+      maxDiff = (maxDiff < currDiff_real) ? currDiff_real : maxDiff;
+	    maxDiff = (maxDiff < currDiff_imag) ? currDiff_imag : maxDiff;
+      if (currDiff_real > CHECK_TOL || currDiff_imag > CHECK_TOL) {
+          errCount++;	    
+      }
     }
   }
-  
   if (errCount > 0) {
     float percentError = ((float)errCount / (float)(n)) * 100.0;
     printf("\n@ERROR: TEST FAILED: %d results did not match (%0.6f%%)\n", errCount, percentError);
-  }
-  else if (zeroCount > 0){
-    printf("\n@ERROR: TEST FAILED: %d results (from GPU) are zero\n", zeroCount);
   }
   else {
     printf("\nTEST PASSED: All results matched\n");
@@ -280,7 +322,7 @@ void runIteration(int rowLen)
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
-  CUDA_SAFE_CALL(cudaFree(d_array_rev));
+  CUDA_SAFE_CALL(cudaFree(d_array_out));
   free(h_serial_array);
   free(h_array);
 
@@ -329,11 +371,11 @@ void printArray(int rowLen, cplx* data)
 }
 
 /* Performs in place FFT on buf of size n*/
-void reverse(cplx buf[], int n) 
+void fft(cplx buf[], int n) 
 {
 	//Rearrange the array such that it can be iterated upon in the correct order
 	//This is called decimination-in-time or Cooley-Turkey algorithm to rearrange it first, then do nlogn iterations
-	int i, j;
+	int i, j, len;
 	for (i = 1, j = 0; i < n; i++) 
 	{
 		int bit = n >> 1;
@@ -350,17 +392,82 @@ void reverse(cplx buf[], int n)
 			buf[j] = temp;
 		}
   }
+
+	/*Compute the FFT for the array*/
+	cplx wlen, w, u, v;
+	// len goes 2, 4, ... n/2, n
+	// len iterates over the array log2(n) times
+  for (len = 2; len <= n; len <<= 1) 
+	{
+		double ang = 2 * M_PI / len;
+		wlen = cexp(I * ang);
+		
+		/* i goes from 0 to n with stride len
+		j goes from 0 to len/2 in stride 1
+
+		The sum of i+j is used to index into the buffer 
+		and determine the correct indexes at which to perform the DFT.
+		For example if n = 8:
+		For the first iteration len = 2, i = 0,2,4,8, j = 0 so that i + j = 0,2,4,8.  
+		For the second iteration len = 4, i = 0,4, j = 0,1  so that i + j = 0,1,4,5.  
+		For the final iteration len = 8, i = 0, j = 0,1,2,3 so that i + j = 0,1,2,3.
+		This allows us to DFT properly for each index based on the conceptual algorithm.
+
+		For each iteration of there are n/2 iterations as shown above,
+		*/
+		for (i = 0; i < n; i += len) 
+		{
+			w = 1;
+			for (j = 0; j < (len / 2); j++) 
+			{
+				//Compute the DFT on the correct elements
+				u = buf[i+j];
+				v = buf[i+j+(len/2)] * w;
+				buf[i+j] = u + v;
+				buf[i+j+(len/2)] = u - v;
+				w *= wlen;
+			}
+		}
+  }
+}
+
+/* Transpose the matrix */
+void transpose(cplx buf[], int rowLen)
+{
+	int i, j;
+	cplx temp;
+	for (i = 0; i < rowLen; i++)
+	{
+		for (j = i+1; j < rowLen; j++)
+		{
+			temp = buf[i*rowLen + j];
+			buf[i*rowLen + j] = buf[j*rowLen + i];
+			buf[j*rowLen + i] = temp;
+		}
+	}
 }
 
 /* Orchestrates the row-column 2D FFT algorithm */
-void reverse_2d(cplx buf[], int rowLen, int n)
+void fft_2d(cplx buf[], int rowLen, int n)
 {
 	// Do rows
 	int i;
 	for(i = 0; i < n; i += rowLen)
 	{
-		reverse(buf+i, rowLen);
+		fft(buf+i, rowLen);
 	}
+
+	// Transpose the matrix
+	transpose(buf, rowLen);
+
+	// Do columns
+	for(i = 0; i < n; i += rowLen)
+	{
+		fft(buf+i, rowLen);
+	}
+
+	// Transpose back
+	transpose(buf, rowLen);
 }
 
 //Print the complex arrays before and after FFT
