@@ -1,2 +1,10 @@
-
 .vscode/settings.json
+
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
