@@ -4,10 +4,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.067808 (msec)
-GPU overall time: 0.163648 (msec)
+GPU kernel time: 0.040960 (msec)
+GPU overall time: 273.424316 (msec)
 FFT_serial() start
-FFT_serial() took 0.022810 (msec)
+FFT_serial() took 0.016381 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -20,10 +20,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.041664 (msec)
-GPU overall time: 0.105056 (msec)
+GPU kernel time: 0.021504 (msec)
+GPU overall time: 236.120377 (msec)
 FFT_serial() start
-FFT_serial() took 0.030551 (msec)
+FFT_serial() took 0.021800 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -36,10 +36,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.045568 (msec)
-GPU overall time: 0.108256 (msec)
+GPU kernel time: 0.027648 (msec)
+GPU overall time: 253.905563 (msec)
 FFT_serial() start
-FFT_serial() took 0.043195 (msec)
+FFT_serial() took 0.035490 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -52,10 +52,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.042464 (msec)
-GPU overall time: 0.101728 (msec)
+GPU kernel time: 0.021504 (msec)
+GPU overall time: 235.298401 (msec)
 FFT_serial() start
-FFT_serial() took 0.155110 (msec)
+FFT_serial() took 0.131741 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -68,10 +68,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.052416 (msec)
-GPU overall time: 0.128384 (msec)
+GPU kernel time: 0.027648 (msec)
+GPU overall time: 237.953247 (msec)
 FFT_serial() start
-FFT_serial() took 0.622062 (msec)
+FFT_serial() took 0.542086 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -84,10 +84,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.047040 (msec)
-GPU overall time: 0.169312 (msec)
+GPU kernel time: 0.029696 (msec)
+GPU overall time: 233.907303 (msec)
 FFT_serial() start
-FFT_serial() took 2.762210 (msec)
+FFT_serial() took 2.290061 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -100,10 +100,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.046656 (msec)
-GPU overall time: 0.280096 (msec)
+GPU kernel time: 0.023168 (msec)
+GPU overall time: 178.230438 (msec)
 FFT_serial() start
-FFT_serial() took 12.423527 (msec)
+FFT_serial() took 10.823711 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -116,10 +116,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.067424 (msec)
-GPU overall time: 0.816064 (msec)
+GPU kernel time: 0.031296 (msec)
+GPU overall time: 196.517059 (msec)
 FFT_serial() start
-FFT_serial() took 54.113571 (msec)
+FFT_serial() took 48.270856 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -132,10 +132,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.159328 (msec)
-GPU overall time: 2.431008 (msec)
+GPU kernel time: 0.038432 (msec)
+GPU overall time: 189.905853 (msec)
 FFT_serial() start
-FFT_serial() took 236.315243 (msec)
+FFT_serial() took 207.268744 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -148,10 +148,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 0.630304 (msec)
-GPU overall time: 9.340864 (msec)
+GPU kernel time: 0.136096 (msec)
+GPU overall time: 231.963333 (msec)
 FFT_serial() start
-FFT_serial() took 1026.090089 (msec)
+FFT_serial() took 893.289891 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
@@ -164,10 +164,10 @@ Initializing the arrays ...	... done
 
 Kernal code launching
 
-GPU kernel time: 2.547712 (msec)
-GPU overall time: 39.500961 (msec)
+GPU kernel time: 0.472384 (msec)
+GPU overall time: 269.939606 (msec)
 FFT_serial() start
-FFT_serial() took 4516.378897 (msec)
+FFT_serial() took 3919.830147 (msec)
 
 TEST PASSED: All results matched
 MAX_DIFFERENCE = 0.000000 between serial and GPU code
