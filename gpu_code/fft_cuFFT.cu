@@ -15,6 +15,7 @@
 #include "./utilities/cuPrintf.cu"
 #include "./utilities/cuPrintf.cuh"
 #include <cuComplex.h>
+#include <cufft.h>
 
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
@@ -54,90 +55,6 @@ void show_buffer(cplx buf[], int rowLen, int n);
 void transpose(cplx buf[], int rowLen);
 void fft(cplx buf[], int n);
 void fft_2d(cplx buf[], int rowLen, int n);
-
-/*......CUDA Device Functions......*/
-//Computes the FFT for a Block that has already been loaded in bit reversed order
-__device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
-{
-  cuDoubleComplex w, u, v;
-  int len, i, j;
-  for (len = 2; len <= rowLen; len <<= 1)
-  {
-    double ang = 2 * M_PI / len;
-    for (i = (threadIdx.x + (blockDim.x*threadIdx.y))*len; i < rowLen; i += (blockDim.x*blockDim.y)*len)
-    //for (i = 0; i < rowLen; i += len)
-		{
-			//for (j = threadIdx.x + (blockDim.x*threadIdx.y); j < (len / 2); j += blockDim.x*blockDim.y)
-			for (j = 0; j < (len / 2); j++) 
-			{
-				//Compute the DFT on the correct elements
-        w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
-				u = d_shared[i+j];
-				v = cuCmul(d_shared[i+j+(len/2)], w);
-				d_shared[i+j] = cuCadd(u, v);
-				d_shared[i+j+(len/2)] = cuCsub(u, v);
-			}
-			//__syncthreads();
-		}
-	__syncthreads();
-  }
-}
-
-// FFT kernel per SM code for rows
-__global__ void FFT_Kernel_Row(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
-{
-  for(int rowIdx = blockIdx.x; rowIdx < rowLen; rowIdx += gridDim.x)
-  {
-    int rowSz = rowIdx*rowLen;
-    int colIdx  = threadIdx.x + (blockDim.x*threadIdx.y);
-
-    //Load the given index into shared memory and do the bit order reversal in the time domain
-    __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-    for(; colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
-    {  
-      d_shared[(__brev(colIdx) >> (32 - logn))] = d_in[colIdx + rowSz];
-    }
-    __syncthreads();
-
-    //Do the FFT itself for the row
-    InnerFFT(rowLen, &d_shared[0]);
-    __syncthreads();
-    
-    //Copy the data from shared memory to output
-    for(colIdx  = threadIdx.x + (blockDim.x*threadIdx.y); colIdx < rowLen; colIdx += blockDim.x*blockDim.y)
-    {  
-      d_out[colIdx + rowSz] = d_shared[colIdx];
-    } 
-  }
-  __syncthreads();
-}
-
-// FFT kernel per SM code for columns
-__global__ void FFT_Kernel_Col(int rowLen, int logn,  cuDoubleComplex* d_out, cuDoubleComplex* d_in)
-{
-  for(int colIdx = blockIdx.x; colIdx < rowLen; colIdx += gridDim.x)
-  {
-    int rowIdx  = threadIdx.y + (blockDim.y*threadIdx.x);
-
-    //Load the given index into shared memory and do the bit order reversal in the time domain
-    __shared__ cuDoubleComplex d_shared[MAX_SM_ELEM_NUM];
-    for(; rowIdx < rowLen; rowIdx += blockDim.y*blockDim.y)
-    {  
-      d_shared[(__brev(rowIdx) >> (32 - logn))] = d_in[rowIdx*rowLen + colIdx];
-    }
-    __syncthreads();
-
-    //Do the FFT itself for the column
-    InnerFFT(rowLen, &d_shared[0]);
-    __syncthreads();
-
-    //Copy the data from shared memory to output
-    for(rowIdx  = threadIdx.y + (blockDim.y*threadIdx.x); rowIdx < rowLen; rowIdx += blockDim.y*blockDim.x)
-    {  
-      d_out[rowIdx*rowLen + colIdx] = d_shared[rowIdx];
-    } 
-  }
-}
 
 /*......Host Code......*/
 int main(int argc, char **argv)
@@ -207,7 +124,7 @@ void runIteration(int rowLen)
   printf("\t... done\n\n");
 
   //Copy double complex array to cuDoubleComplex array
-  cuDoubleComplex* d = (cuDoubleComplex*) malloc(sizeof(cuDoubleComplex) * n);
+  cufftDoubleComplex* d = (cufftDoubleComplex*) malloc(sizeof(cufftDoubleComplex) * n);
   for(i = 0; i < n; i++)
   {
     double real_part = creal(h_array[i]);
@@ -216,11 +133,18 @@ void runIteration(int rowLen)
     CUDA_SAFE_CALL(cudaPeekAtLastError());
   }
 
-  // Allocate arrays on GPU global memory
-  cuDoubleComplex* d_array;
-  cuDoubleComplex* d_array_out;
-  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cuDoubleComplex)));
-  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
+  // Allocate arrays on GPU global memory using cuFFT syntax
+  cufftHandle plan;
+  cufftDoubleComplex *d_array;
+  //cuDoubleComplex* d_array;
+  //cuDoubleComplex* d_array_out;
+  CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cufftDoubleComplex)));
+  //CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
+  if(cufftPlan2d(&plan, rowLen, rowLen, CUFFT_Z2Z))
+  {
+    fprintf(stderr, "CUFFT Error: Unable to create plan\n");
+	  exit(EXIT_FAILURE);
+  };
   
   // Start overall GPU timing
   cudaEventCreate(&start);
@@ -245,13 +169,17 @@ void runIteration(int rowLen)
   cudaEventRecord(start_kernel, 0);
 
   // Compute the fft for each thread
-  int s = (int)log2((float)rowLen);
+  if (cufftExecZ2Z(plan, d_array, d_array) != CUFFT_SUCCESS){
+    fprintf(stderr, "CUFFT Error: Unable to execute plan\n");
+    return;		
+  }
+  // int s = (int)log2((float)rowLen);
 
-  FFT_Kernel_Row<<<DimGrid, DimBlock>>>(rowLen, s, d_array_out, d_array);
-  cudaDeviceSynchronize();
+  // FFT_Kernel_Row<<<DimGrid, DimBlock>>>(rowLen, s, d_array_out, d_array);
+  // cudaDeviceSynchronize();
 
-  FFT_Kernel_Col<<<DimGrid, DimBlock>>>(rowLen, s, d_array, d_array_out);
-  cudaDeviceSynchronize();
+  // FFT_Kernel_Col<<<DimGrid, DimBlock>>>(rowLen, s, d_array, d_array_out);
+  // cudaDeviceSynchronize();
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
@@ -330,6 +258,7 @@ void runIteration(int rowLen)
   CUDA_SAFE_CALL(cudaFree(d_array_out));
   free(h_serial_array);
   free(h_array);
+  cufftDestroy(plan);
 
   CUDA_SAFE_CALL(cudaDeviceReset());
 
