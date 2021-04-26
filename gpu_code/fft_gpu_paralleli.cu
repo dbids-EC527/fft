@@ -369,7 +369,10 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
+      if(cimag(data[i*rowLen+j]) < 0)
+        printf("%.1f-j%.1f, ", creal(data[i*rowLen+j]), abs(cimag(data[i*rowLen+j])));
+      else
+      	printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
