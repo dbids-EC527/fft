@@ -137,22 +137,19 @@ void runIteration(int rowLen)
   // Allocate arrays on GPU global memory using cuFFT syntax
   cufftHandle plan;
   cufftDoubleComplex *d_array;
-  //cuDoubleComplex* d_array;
-  //cuDoubleComplex* d_array_out;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cufftDoubleComplex)));
-  //CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
   
-  // Start overall GPU timing
-  cudaEventCreate(&start);
-  cudaEventCreate(&stop);
-  cudaEventRecord(start, 0);
-
   //Plan the cuFFT
   if(cufftPlan2d(&plan, rowLen, rowLen, CUFFT_Z2Z))
   {
     fprintf(stderr, "CUFFT Error: Unable to create plan\n");
 	  exit(EXIT_FAILURE);
   };
+
+  // Start overall GPU timing
+  cudaEventCreate(&start);
+  cudaEventCreate(&stop);
+  cudaEventRecord(start, 0);
 
   //Transfer cuDoubleArray to device memory
   CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
@@ -176,13 +173,6 @@ void runIteration(int rowLen)
     fprintf(stderr, "CUFFT Error: Unable to execute plan\n");
     return;		
   }
-  // int s = (int)log2((float)rowLen);
-
-  // FFT_Kernel_Row<<<DimGrid, DimBlock>>>(rowLen, s, d_array_out, d_array);
-  // cudaDeviceSynchronize();
-
-  // FFT_Kernel_Col<<<DimGrid, DimBlock>>>(rowLen, s, d_array, d_array_out);
-  // cudaDeviceSynchronize();
 
   // End kernel timing
   cudaEventRecord(stop_kernel, 0);
@@ -258,7 +248,6 @@ void runIteration(int rowLen)
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
-  //CUDA_SAFE_CALL(cudaFree(d_array_out));
   free(h_serial_array);
   free(h_array);
   cufftDestroy(plan);
