@@ -55,25 +55,23 @@ void fft_2d(cplx buf[], int rowLen, int n);
 /*......CUDA Device Functions......*/
 __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 {
-  cuDoubleComplex wlen, w, u, v;
+  cuDoubleComplex w, u, v;
   int len, i, j;
   if (threadIdx.x == 0 && threadIdx.y == 0)
   {
     for (len = 2; len <= rowLen; len <<= 1)
     {
       double ang = 2 * M_PI / len;
-      wlen = make_cuDoubleComplex(cos(ang), sin(ang));
       for (i = 0; i < rowLen; i += len)
       {
-        w = make_cuDoubleComplex(1, 0);
         for (j = 0; j < (len / 2); j++) 
         {
           //Compute the DFT on the correct elements
+          w = make_cuDoubleComplex(cos(-ang*j), sin(-ang*j));
           u = d_shared[i+j];
           v = cuCmul(d_shared[i+j+(len/2)], w);
           d_shared[i+j] = cuCadd(u, v);
           d_shared[i+j+(len/2)] = cuCsub(u, v);
-          w = cuCmul(w, wlen);
         }
       }
     }

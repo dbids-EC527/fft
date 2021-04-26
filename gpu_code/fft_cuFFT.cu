@@ -141,16 +141,18 @@ void runIteration(int rowLen)
   //cuDoubleComplex* d_array_out;
   CUDA_SAFE_CALL(cudaMalloc((void**)&d_array, n*sizeof(cufftDoubleComplex)));
   //CUDA_SAFE_CALL(cudaMalloc((void**)&d_array_out, n*sizeof(cuDoubleComplex)));
-  if(cufftPlan2d(&plan, rowLen, rowLen, CUFFT_Z2Z))
-  {
-    fprintf(stderr, "CUFFT Error: Unable to create plan\n");
-	  exit(EXIT_FAILURE);
-  };
   
   // Start overall GPU timing
   cudaEventCreate(&start);
   cudaEventCreate(&stop);
   cudaEventRecord(start, 0);
+
+  //Plan the cuFFT
+  if(cufftPlan2d(&plan, rowLen, rowLen, CUFFT_Z2Z))
+  {
+    fprintf(stderr, "CUFFT Error: Unable to create plan\n");
+	  exit(EXIT_FAILURE);
+  };
 
   //Transfer cuDoubleArray to device memory
   CUDA_SAFE_CALL(cudaMemcpy(d_array, d, allocSize, cudaMemcpyHostToDevice));
