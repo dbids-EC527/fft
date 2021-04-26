@@ -1,6 +1,5 @@
 /*
-    nvcc -arch sm_35 fft_gpu.cu -o fft_gpu
-    nvcc -arch compute_70 -code sm_70 fft_gpu.cu -o fft_gpu
+    nvcc -arch compute_70 -code sm_70 fft_cuFFT.cu -o fft_cuFFT -lcufft 
 
     Helpful GPU code for reference:
     https://github.com/marianhlavac/FFT-cuda/blob/master/src/fft-cuda.cu
@@ -16,7 +15,8 @@
 #include "./utilities/cuPrintf.cuh"
 #include <cuComplex.h>
 #include <cufft.h>
-
+#include <cufftXt.h>
+#include <cufftw.h>
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
@@ -169,7 +169,7 @@ void runIteration(int rowLen)
   cudaEventRecord(start_kernel, 0);
 
   // Compute the fft for each thread
-  if (cufftExecZ2Z(plan, d_array, d_array) != CUFFT_SUCCESS){
+  if (cufftExecZ2Z(plan, d_array, d_array, CUFFT_FORWARD) != CUFFT_SUCCESS){
     fprintf(stderr, "CUFFT Error: Unable to execute plan\n");
     return;		
   }
@@ -255,7 +255,7 @@ void runIteration(int rowLen)
   
   // Free-up device and host memory
   CUDA_SAFE_CALL(cudaFree(d_array));
-  CUDA_SAFE_CALL(cudaFree(d_array_out));
+  //CUDA_SAFE_CALL(cudaFree(d_array_out));
   free(h_serial_array);
   free(h_array);
   cufftDestroy(plan);
