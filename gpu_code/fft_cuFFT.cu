@@ -34,7 +34,7 @@ typedef double complex cplx;
 
 //Definitions which turn on and off test printing
 //#define PRINT_GPU
-#define PRINT_MATRIX
+//#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
