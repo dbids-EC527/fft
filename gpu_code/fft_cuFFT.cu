@@ -17,6 +17,7 @@
 #include <cufft.h>
 #include <cufftXt.h>
 #include <cufftw.h>
+
 // Assertion to check for errors
 #define CUDA_SAFE_CALL(ans) { gpuAssert((ans), (char *)__FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, char *file, int line, bool abort=true)
@@ -33,7 +34,7 @@ typedef double complex cplx;
 
 //Definitions which turn on and off test printing
 //#define PRINT_GPU
-//#define PRINT_MATRIX
+#define PRINT_MATRIX
 
 //Best performance occurs when the number of pixels is divisable by the number of threads
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
@@ -298,7 +299,10 @@ void printArray(int rowLen, cplx* data)
   { 
     for (j = 0; j < rowLen; j++)
     { 
-      printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
+      if(cimag(data[i*rowLen+j]) < 0)
+        printf("%.1f-j%.1f, ", creal(data[i*rowLen+j]), abs(cimag(data[i*rowLen+j])));
+      else
+      	printf("%.1f+j%.1f, ", creal(data[i*rowLen+j]), cimag(data[i*rowLen+j]));
     }
     printf("\n");
   }
