@@ -71,7 +71,7 @@ __device__ inline void InnerFFT(int rowLen, cuDoubleComplex* d_shared)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-        w = make_cuDoubleComplex(cos(ang*j), sin(ang*j));
+        w = make_cuDoubleComplex(cos(-ang*j), sin(-ang*j));
 				u = d_shared[i+j];
 				v = cuCmul(d_shared[i+j+(len/2)], w);
 				d_shared[i+j] = cuCadd(u, v);
@@ -427,7 +427,7 @@ void fft(cplx buf[], int n)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-				w = cexp(I * ang * j);
+				w = cexp(-I * ang * j);
         u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
 				buf[i+j] = u + v;

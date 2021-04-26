@@ -32,9 +32,9 @@ typedef double complex cplx;
 #define MAXVAL       10.0
 
 //Used to iterate through different array sizes
-#define DELTA 2
-#define BASE  0
-#define ITERS 16    
+#define DELTA 0
+#define BASE  4
+#define ITERS 1   
 
 //Prototypes
 double interval(struct timespec start, struct timespec end);
@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
     //printf("%ld, %g\n", i,  (((double)time_stamp[iters].tv_sec) + \
                             ((double)time_stamp[iters].tv_sec)*1.0e-9));
   }
+  
  
 	return 0;
 }

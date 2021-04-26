@@ -70,8 +70,8 @@ void fft(cplx buf[], int n)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-				w = cexp(I * ang * j);
-        u = buf[i+j];
+				w = cexp(-I * ang * j);
+				u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
 				buf[i+j] = u + v;
 				buf[i+j+(len/2)] = u - v;
@@ -110,7 +110,7 @@ void fft_wlen(cplx buf[], int n)
   	for (len = 2; len <= n; len <<= 1) 
 	{
 		double ang = 2 * PI / len;
-		wlen = cexp(I * ang);
+		wlen = cexp(-I * ang);
 
 		/* i goes from 0 to n with stride len
 		j goes from 0 to len/2 in stride 1

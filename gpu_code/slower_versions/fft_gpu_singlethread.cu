@@ -422,7 +422,7 @@ void fft(cplx buf[], int n)
 			for (j = 0; j < (len / 2); j++) 
 			{
 				//Compute the DFT on the correct elements
-				w = cexp(I * ang * j);
+				w = cexp(-I * ang * j);
         u = buf[i+j];
 				v = buf[i+j+(len/2)] * w;
 				buf[i+j] = u + v;
