@@ -8,3 +8,4 @@
 
 # Unignore all dirs
 !*/
+image_code/fft_2d_image
