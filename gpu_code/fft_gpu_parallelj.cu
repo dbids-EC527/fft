@@ -38,8 +38,8 @@ typedef double complex cplx;
 //Maximum Threads per Block is 1024, Maximum Shared Memory is 48KB
 //cuComplexDouble is 16 bytes, therefore we can have 3072 elements in shared memory at once
 #define MAX_SM_ELEM_NUM	  3072
-#define BLOCK_DIM 	  16	 //Max of 32
-#define GRID_DIM	  3072 	 //Max of 2147483647
+#define BLOCK_DIM 	      16	    //Max of 32
+#define GRID_DIM	        3072 	  //Max of 2147483647
 
 #define CHECK_TOL          0.05
 #define MINVAL             0.0
