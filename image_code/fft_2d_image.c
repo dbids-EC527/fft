@@ -13,9 +13,8 @@
 		https://cp-algorithms.com/algebra/fft.html
 	*	Helpful visualization of the algorithm:
 		https://towardsdatascience.com/fast-fourier-transform-937926e591cb
-  *	Image input/output library:
-    https://solarianprogrammer.com/2019/06/10/c-programming-reading-writing-images-stb_image-libraries/
-  * Logorithmic Scaling for images and test FFT images:
+    *	Image input/output library:      https://solarianprogrammer.com/2019/06/10/c-programming-reading-writing-images-stb_image-libraries/
+    * Logorithmic Scaling for images and test FFT images:
     https://homepages.inf.ed.ac.uk/rbf/HIPR2/pixlog.htm
 */
 

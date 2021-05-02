@@ -1,8 +1,5 @@
 /*
     nvcc -arch compute_70 -code sm_70 fft_cuFFT.cu -o fft_cuFFT -lcufft 
-
-    Helpful GPU code for reference:
-    https://github.com/marianhlavac/FFT-cuda/blob/master/src/fft-cuda.cu
 */
 
 #include <cstdio>
